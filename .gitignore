@@ -1,0 +1,6 @@
+stan/*.rds
+stan_build_log/
+.Rhistory
+.Rproj.user
+.RData
+*.log

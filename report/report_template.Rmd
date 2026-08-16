@@ -1,0 +1,126 @@
+---
+title: "Species Richness Estimation Report"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+params:
+  taxon_name: "Unnamed taxon"
+  mode: "parasitic"
+  interval_years: 5
+  results: !r NULL
+  interval_table: !r NULL
+  generated_at: !r Sys.time()
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 5)
+# plot_*() functions are already available in .GlobalEnv (sourced once at app
+# startup by global.R); no need to re-source here, and the report's own
+# working directory is report/, not the project root, so a relative
+# source("R/plotting.R") would fail anyway.
+results <- params$results
+interval_table <- params$interval_table
+```
+
+# `r params$taxon_name`
+
+**Mode:** `r ifelse(params$mode == "parasitic", "Parasitic (host-availability covariate available)", "Free-living (no host covariate)")`
+**Interval width:** `r params$interval_years` years
+**Report generated:** `r format(params$generated_at, "%Y-%m-%d %H:%M %Z")`
+
+*This report was generated on demand from data you supplied for this session only. No
+uploaded data, fitted model, or figure is stored on the server; this document is the
+only durable record of the analysis.*
+
+## Method
+
+New species described in interval $i$ ($S_i$) are modeled as
+$S_i \sim \text{Poisson}(\lambda_i)$, with
+
+$$\log \lambda_i = \big(\log L_0 + \beta \cdot Y_i\big) + \log(S_T - \text{cumS}_i) \; [+ \log(H_t - \text{cumH}_i)] \;+ \log(1 + T_i)$$
+
+where $S_T$ is the total number of species expected to exist, $L_0$ and $\beta$
+describe baseline and time-trending taxonomic efficiency, $T_i$ is the number of
+active taxonomists (an effort proxy), $\text{cumS}_i$ is the cumulative species
+described before interval $i$, and the optional host term $(H_t - \text{cumH}_i)$
+is included only for the "host" structure. This is the same model family used in
+Boeger et al. (submitted, *Zoologia*, ZOOL-2026-0012.R1) to estimate Brazilian
+Dactylogyridae and Actinopterygii richness, generalized here to any user-supplied
+taxon and adapted from Pimm et al. (2010) and Joppa et al. (2011). Models were fit
+in Stan via `rstan`, with priors on $S_T$ (Gamma), $\log L_0$ and $\beta$ (Normal)
+supplied by the user for this run.
+
+## Data summary
+
+```{r}
+knitr::kable(interval_table, digits = 2)
+```
+
+```{r}
+knitr::kable(
+  data.frame(
+    Metric = c("Total intervals", "Total species described (observed)", "Total unique taxonomists (summed)"),
+    Value = c(nrow(interval_table), sum(interval_table$n_species), sum(interval_table$n_authors))
+  )
+)
+```
+
+```{r effort-scatter}
+plot_effort_scatter(interval_table)
+```
+
+```{r single-results, results='asis', eval=identical(results$job_type, "single")}
+structure_labels <- c(host = "With host covariate", no_host = "Without host covariate")
+for (st in names(results$per_structure)) {
+  r <- results$per_structure[[st]]
+  cat("\n\n## Model:", structure_labels[[st]], "\n\n")
+
+  cat("\n\n### Parameter estimates\n\n")
+  print(knitr::kable(r$summary, digits = 4, row.names = FALSE))
+
+  cat("\n\n### Posterior distributions\n\n")
+  print(plot_posterior_hist(r$fit, "ST"))
+  print(plot_posterior_hist(r$fit, "log_L0"))
+  print(plot_posterior_hist(r$fit, "beta"))
+
+  cat("\n\n### Trace plots (convergence diagnostics)\n\n")
+  print(plot_trace(r$fit, "ST"))
+
+  cat("\n\n### Simulated vs. observed discovery rate\n\n")
+  print(plot_ppc(r$fit, interval_table))
+
+  cat("\n\n### Percent of estimated total diversity already described\n\n")
+  print(plot_percent_described(r$pct_draws))
+
+  cat("\n\n### Extrapolated cumulative discovery\n\n")
+  st_median <- r$summary$median[r$summary$parameter == "ST"]
+  print(plot_extrapolation(interval_table, r$extrapolation, ST_median = st_median))
+
+  cat("\n\n")
+}
+```
+
+```{r battery-results, results='asis', eval=identical(results$job_type, "battery")}
+cat("\n\n## Sensitivity battery: all scenarios \u00d7 structures\n\n")
+cat("\n\nBest-supported model by LOO-ELPD: **", results$best_model_label, "**\n\n")
+
+comp <- results$comparison_table
+print(knitr::kable(comp[, c("model_label", "scenario", "structure", "ST_median", "ST_lower", "ST_upper",
+                             "elpd_loo", "elpd_diff", "mean_crps", "mean_mae")], digits = 3, row.names = FALSE))
+
+print(plot_loo_comparison(comp))
+print(plot_predictive_scores(comp))
+
+cat("\n\n### Detail for the best-supported model\n\n")
+best_fit <- results$fits[[results$best_model_label]]
+print(plot_posterior_hist(best_fit, "ST"))
+print(plot_ppc(best_fit, interval_table))
+```
+
+## Data handling notice
+
+No dataset, credential, or result from this analysis is retained by the
+application after this browser session ends. Save this report and any
+downloaded figures locally if you need them again.

@@ -1,0 +1,9 @@
+.git
+.gitignore
+test_data/
+stan_build_log/
+stan/*.rds
+*.Rhistory
+.Rproj.user
+.RData
+*.log
