@@ -92,6 +92,7 @@ server <- function(input, output, session) {
         nav_panel("2. Priors & Run", run_ui()),
         nav_panel("3. Results", results_ui()),
         nav_panel("4. Download Report", report_ui()),
+        nav_panel("Manual", manual_ui()),
         nav_panel("About", about_ui())
       )
     )
@@ -457,6 +458,18 @@ server <- function(input, output, session) {
       file.copy(out_tmp, file, overwrite = TRUE)
     }
   )
+
+  # ---- Manual -------------------------------------------------------------
+  manual_ui <- function() {
+    tagList(
+      p("The complete user manual covers the scientific method behind the model, exact data requirements, and step-by-step usage instructions for every tab."),
+      tags$a(href = "manual.html", target = "_blank", download = NA,
+             class = "btn btn-primary btn-lg", "Download Manual (HTML)"),
+      hr(),
+      h5("Preview"),
+      tags$iframe(src = "manual.html", style = "width:100%; height:800px; border:1px solid #ddd;")
+    )
+  }
 
   # ---- About ------------------------------------------------------------
   about_ui <- function() {

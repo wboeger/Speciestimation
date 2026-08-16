@@ -38,5 +38,9 @@ COPY . .
 # baked on a developer machine and copied in) -----------------------------
 RUN Rscript build/compile_models.R
 
+# --- Render the static user manual to www/ (Shiny auto-serves www/ as
+# static assets, so the download link needs no server-side handler) -------
+RUN Rscript build/render_manual.R
+
 EXPOSE 8080
 CMD ["Rscript", "run.R"]
