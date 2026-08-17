@@ -54,12 +54,23 @@ $$
 \log \lambda_i \;=\; \underbrace{(\log L_0 + \beta \cdot Y_i)}_{\text{taxonomic efficiency at time } Y_i}
 \;+\; \underbrace{\log(S_T - \text{cumS}_i)}_{\text{species remaining}}
 \;+\; \underbrace{\log(H_t - \text{cumH}_i)}_{\text{hosts remaining (parasitic mode only)}}
-\;+\; \underbrace{\log(1 + T_i)}_{\text{effort}}
+\;+\; \underbrace{\log T_i}_{\text{effort}}
 $$
 
 $$
 S_i \sim \text{Poisson}(\lambda_i)
 $$
+
+This follows the discovery-rate model of Pimm et al. (2010) and Joppa et al.
+(2011) as adapted in Boeger et al. (submitted): the rate of new discoveries is
+proportional to taxonomist effort ($T_i$) and to the pool of species (and, for
+parasites, hosts) not yet found, with a log-linear trend in baseline
+efficiency. *Implementation note:* to keep $\log T_i$ finite for any interval
+with zero active taxonomists, the fitted model evaluates $\log(1+T_i)$ rather
+than $\log T_i$ — a standard Laplace-style safeguard that is numerically
+indistinguishable from $\log T_i$ whenever $T_i \geq $ a few, and only changes
+behavior for empty (zero-effort) intervals, where it keeps their contribution
+finite instead of $-\infty$.
 
 | Symbol | Meaning |
 |---|---|
