@@ -100,6 +100,51 @@ plot_effort_scatter <- function(interval_table) {
     theme_app()
 }
 
+#' Simulated vs. observed species discovered, plotted against taxonomist
+#' effort (the "effort axis" counterpart to `plot_ppc`, which uses the time
+#' axis). Blue = posterior-predictive Si_rep draws, each paired with its
+#' interval's *observed* effort (Ti is data, not simulated); red = the
+#' observed (Ti, Si) pairs and their linear trend.
+plot_effort_scatter_sim <- function(fit, interval_table, n_draws = 100) {
+  si_rep <- rstan::extract(fit, "Si_rep")$Si_rep
+  n_available <- nrow(si_rep)
+  take <- sample(seq_len(n_available), min(n_draws, n_available))
+  sim_df <- as.data.frame(t(si_rep[take, , drop = FALSE]))
+  sim_df$n_authors <- interval_table$n_authors
+  sim_long <- tidyr::pivot_longer(sim_df, cols = -"n_authors", names_to = "draw", values_to = "Si_pred")
+
+  obs_df <- data.frame(n_authors = interval_table$n_authors, Si_obs = interval_table$n_species)
+
+  ggplot2::ggplot() +
+    ggplot2::geom_jitter(data = sim_long, ggplot2::aes(x = .data$n_authors, y = .data$Si_pred),
+                          width = 0.15, height = 0, alpha = 0.08, color = "steelblue") +
+    ggplot2::geom_smooth(data = obs_df, ggplot2::aes(x = .data$n_authors, y = .data$Si_obs),
+                          method = "lm", se = FALSE, color = "black", linetype = "dashed",
+                          linewidth = 0.7, formula = y ~ x) +
+    ggplot2::geom_point(data = obs_df, ggplot2::aes(x = .data$n_authors, y = .data$Si_obs),
+                         color = "firebrick", size = 2.5) +
+    ggplot2::labs(title = "Species discovered vs. taxonomist effort: simulated vs. observed",
+                  subtitle = "Blue = posterior-predictive draws (Si_rep) at each interval's observed effort | Red = observed (Ti, Si)",
+                  x = "Unique taxonomists active in interval (Ti)", y = "New species described (Si)") +
+    theme_app()
+}
+
+#' Trend in taxonomist effort (Ti) itself over time. Purely descriptive \u2014
+#' no fitted model required, so it is available as soon as data is
+#' aggregated (Tab 1), independently of any structure you go on to fit. Lets
+#' you see whether the effort covariate is itself trending up/down/flat
+#' before that gets entangled with the model's own efficiency-trend term.
+plot_effort_trend <- function(interval_table) {
+  ggplot2::ggplot(interval_table, ggplot2::aes(x = .data$interval_end, y = .data$n_authors)) +
+    ggplot2::geom_line(color = "darkorange", alpha = 0.5) +
+    ggplot2::geom_point(size = 2.5, color = "darkorange") +
+    ggplot2::geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 0.8, formula = y ~ x) +
+    ggplot2::labs(title = "Trend in taxonomic effort over time",
+                  subtitle = "Unique taxonomists (authors) active per interval \u2014 independent of species counts",
+                  x = "Interval end-year", y = "Unique taxonomists active (Ti)") +
+    theme_app()
+}
+
 #' Model-comparison plot across scenarios/structures: ELPD difference with SE.
 plot_loo_comparison <- function(comparison_df) {
   ggplot2::ggplot(comparison_df, ggplot2::aes(x = .data$model_label, y = .data$elpd_diff, color = .data$structure)) +

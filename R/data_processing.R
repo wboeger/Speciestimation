@@ -59,14 +59,20 @@ CATEGORY_RANK_COLUMNS <- c(
 )
 
 #' Optional pre-filter for full CTFB-style exports: restrict to one taxonomic
-#' category/value (e.g. family = "Dactylogyridae") and, whenever the relevant
-#' columns are present, to accepted names at species rank
-#' (taxonomicStatus == "NOME_ACEITO", taxonRank == "ESPECIE"). Any filter
-#' whose column is absent from `df` is silently skipped, so this works
-#' unchanged for minimal, non-CTFB spreadsheets too.
+#' category/value (e.g. family = "Dactylogyridae") and, optionally (when the
+#' relevant columns are present AND `apply_status_rank_filter` is TRUE), to
+#' accepted names at species rank (taxonomicStatus == "NOME_ACEITO",
+#' taxonRank == "ESPECIE"). Any filter whose column is absent from `df` is
+#' silently skipped, so this works unchanged for minimal, non-CTFB
+#' spreadsheets too.
 #'
+#' @param apply_status_rank_filter if FALSE, skip the taxonomicStatus/
+#'   taxonRank restriction even when those columns are present \u2014 needed to
+#'   reproduce analyses (e.g. a prior manuscript run) that used every row
+#'   matching the year/name/host criteria regardless of status or rank.
 #' @return list(df = filtered data.frame, n_before, n_after, applied = character vector of filters used)
-apply_category_status_filter <- function(df, category_column = NULL, category_value = NULL) {
+apply_category_status_filter <- function(df, category_column = NULL, category_value = NULL,
+                                          apply_status_rank_filter = TRUE) {
   applied <- character(0)
   n_before <- nrow(df)
 
@@ -77,13 +83,15 @@ apply_category_status_filter <- function(df, category_column = NULL, category_va
                stringr::str_trim(as.character(df[[category_column]])) == stringr::str_trim(category_value), , drop = FALSE]
     applied <- c(applied, sprintf('%s = "%s"', category_column, category_value))
   }
-  if ("taxonomicStatus" %in% names(df)) {
-    df <- df[!is.na(df$taxonomicStatus) & df$taxonomicStatus == "NOME_ACEITO", , drop = FALSE]
-    applied <- c(applied, 'taxonomicStatus = "NOME_ACEITO"')
-  }
-  if ("taxonRank" %in% names(df)) {
-    df <- df[!is.na(df$taxonRank) & df$taxonRank == "ESPECIE", , drop = FALSE]
-    applied <- c(applied, 'taxonRank = "ESPECIE"')
+  if (isTRUE(apply_status_rank_filter)) {
+    if ("taxonomicStatus" %in% names(df)) {
+      df <- df[!is.na(df$taxonomicStatus) & df$taxonomicStatus == "NOME_ACEITO", , drop = FALSE]
+      applied <- c(applied, 'taxonomicStatus = "NOME_ACEITO"')
+    }
+    if ("taxonRank" %in% names(df)) {
+      df <- df[!is.na(df$taxonRank) & df$taxonRank == "ESPECIE", , drop = FALSE]
+      applied <- c(applied, 'taxonRank = "ESPECIE"')
+    }
   }
 
   list(df = df, n_before = n_before, n_after = nrow(df), applied = applied)
@@ -187,11 +195,18 @@ process_species_data <- function(df, mode, interval_years, start_year = NULL, en
     dplyr::arrange(.data$interval_start) %>%
     dplyr::mutate(cum_species_end = cumsum(.data$n_species))
 
-  # drop a trailing interval that only partially covers [start, end_year] (< interval_years span)
+  # Drop a trailing interval that is either (a) narrower than a full
+  # interval_years span (a genuine partial interval at the edge of the
+  # uploaded data), or (b) reaches the current calendar year, since records
+  # published in the year still in progress are necessarily undercounted
+  # (the year has not finished). Matches the convention used in the source
+  # manuscript's own scripts, which unconditionally drop the final interval.
   n_rows <- nrow(agg)
   if (n_rows > 1) {
     last_span <- agg$interval_end[n_rows] - agg$interval_start[n_rows] + 1
-    if (last_span < interval_years && (end_year - agg$interval_start[n_rows] + 1) < interval_years) {
+    partial_span <- last_span < interval_years && (end_year - agg$interval_start[n_rows] + 1) < interval_years
+    still_accumulating <- agg$interval_end[n_rows] >= as.integer(format(Sys.Date(), "%Y"))
+    if (partial_span || still_accumulating) {
       agg <- agg[seq_len(n_rows - 1), ]
     }
   }

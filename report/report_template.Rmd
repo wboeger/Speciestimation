@@ -84,6 +84,10 @@ knitr::kable(
 plot_effort_scatter(interval_table)
 ```
 
+```{r effort-trend}
+plot_effort_trend(interval_table)
+```
+
 ```{r single-comparison, results='asis', eval=identical(results$job_type, "single") && !is.null(results$comparison_table)}
 cat("\n\n## Structure comparison\n\n")
 cat("\n\nYou fit", length(results$per_structure), "structures on the same data \u2014 ranked below by LOO-ELPD (higher/less negative is better). This is how the app lets the observed S_i-vs-effort-vs-time relationship indicate which formula (linear or exponential trend, with or without the host term) fits best, rather than requiring a guess.\n\n")
@@ -111,6 +115,9 @@ for (st in names(results$per_structure)) {
   cat("\n\n### Simulated vs. observed discovery rate\n\n")
   print(plot_ppc(r$fit, interval_table))
 
+  cat("\n\n### Species vs. effort: simulated vs. observed\n\n")
+  print(plot_effort_scatter_sim(r$fit, interval_table))
+
   cat("\n\n### Percent of estimated total diversity already described\n\n")
   print(plot_percent_described(r$pct_draws))
 
@@ -137,6 +144,7 @@ cat("\n\n### Detail for the best-supported model\n\n")
 best_fit <- results$fits[[results$best_model_label]]
 print(plot_posterior_hist(best_fit, "ST"))
 print(plot_ppc(best_fit, interval_table))
+print(plot_effort_scatter_sim(best_fit, interval_table))
 ```
 
 ## Data handling notice

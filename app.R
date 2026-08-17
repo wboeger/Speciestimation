@@ -111,6 +111,7 @@ server <- function(input, output, session) {
         fileInput("upload", "Species inventory (.xlsx or .csv)", accept = c(".xlsx", ".csv")),
         uiOutput("category_ui"),
         uiOutput("category_value_ui"),
+        uiOutput("status_rank_filter_ui"),
         helpText("Required columns: scientificName, namePublishedInYear, scientificNameAuthorship",
                  "; parasitic mode additionally requires animalHostNames (semicolon-separated host list)."),
         numericInput("interval_years", "Interval width (years)", value = 5, min = 1, max = 50, step = 1),
@@ -127,7 +128,11 @@ server <- function(input, output, session) {
       uiOutput("category_filter_status"),
       DTOutput("preview_table"),
       h4("Aggregated intervals (used for model fitting)"),
-      DTOutput("interval_table_out")
+      DTOutput("interval_table_out"),
+      fluidRow(
+        column(6, plotOutput("setup_effort_scatter_plot")),
+        column(6, plotOutput("setup_effort_trend_plot"))
+      )
     )
   }
 
@@ -189,6 +194,14 @@ server <- function(input, output, session) {
                 selected = "(none)")
   })
 
+  output$status_rank_filter_ui <- renderUI({
+    req(rv$raw_df)
+    if (!any(c("taxonomicStatus", "taxonRank") %in% names(rv$raw_df))) return(NULL)
+    checkboxInput("auto_status_filter",
+                   "Restrict to accepted, species-rank names (taxonomicStatus/taxonRank)",
+                   value = TRUE)
+  })
+
   output$category_value_ui <- renderUI({
     req(rv$raw_df, input$category_column, !identical(input$category_column, "(none)"))
     col <- input$category_column
@@ -202,7 +215,9 @@ server <- function(input, output, session) {
     req(rv$raw_df)
     cat_col <- if (is.null(input$category_column)) NULL else input$category_column
     cat_val <- if (is.null(input$category_value)) NULL else input$category_value
-    apply_category_status_filter(rv$raw_df, category_column = cat_col, category_value = cat_val)
+    apply_status <- if (is.null(input$auto_status_filter)) TRUE else isTRUE(input$auto_status_filter)
+    apply_category_status_filter(rv$raw_df, category_column = cat_col, category_value = cat_val,
+                                  apply_status_rank_filter = apply_status)
   })
 
   output$preview_table <- renderDT({
@@ -246,6 +261,16 @@ server <- function(input, output, session) {
     }
     req(rv$processed)
     datatable(rv$processed$interval_table, options = list(scrollX = TRUE, pageLength = 8))
+  })
+
+  output$setup_effort_scatter_plot <- renderPlot({
+    req(rv$processed)
+    plot_effort_scatter(rv$processed$interval_table)
+  })
+
+  output$setup_effort_trend_plot <- renderPlot({
+    req(rv$processed)
+    plot_effort_trend(rv$processed$interval_table)
   })
 
   # ---- 2. Priors & Run ---------------------------------------------------
@@ -492,6 +517,7 @@ server <- function(input, output, session) {
               column(6, plotOutput(paste0("trace_ST_", st)))
             ),
             plotOutput(paste0("ppc_", st)),
+            plotOutput(paste0("effort_sim_", st)),
             fluidRow(
               column(6, plotOutput(paste0("pct_", st))),
               column(6, plotOutput(paste0("extrap_", st)))
@@ -506,7 +532,9 @@ server <- function(input, output, session) {
         p(strong("Best-supported model (LOO-ELPD): "), res$best_model_label),
         DTOutput("battery_table"),
         plotOutput("battery_loo_plot"),
-        plotOutput("battery_scores_plot")
+        plotOutput("battery_scores_plot"),
+        h4("Best-supported model detail"),
+        plotOutput("battery_effort_sim_plot")
       )
     }
   })
@@ -523,6 +551,7 @@ server <- function(input, output, session) {
           output[[paste0("post_ST_", st_)]] <- renderPlot(plot_posterior_hist(r$fit, "ST"))
           output[[paste0("trace_ST_", st_)]] <- renderPlot(plot_trace(r$fit, "ST"))
           output[[paste0("ppc_", st_)]] <- renderPlot(plot_ppc(r$fit, res$interval_table))
+          output[[paste0("effort_sim_", st_)]] <- renderPlot(plot_effort_scatter_sim(r$fit, res$interval_table))
           output[[paste0("pct_", st_)]] <- renderPlot(plot_percent_described(r$pct_draws))
           st_median <- r$summary$median[r$summary$parameter == "ST"]
           output[[paste0("extrap_", st_)]] <- renderPlot(plot_extrapolation(res$interval_table, r$extrapolation, st_median))
@@ -537,6 +566,8 @@ server <- function(input, output, session) {
       output$battery_table <- renderDT(datatable(res$comparison_table, options = list(scrollX = TRUE)))
       output$battery_loo_plot <- renderPlot(plot_loo_comparison(res$comparison_table))
       output$battery_scores_plot <- renderPlot(plot_predictive_scores(res$comparison_table))
+      best_fit <- res$fits[[res$best_model_label]]
+      output$battery_effort_sim_plot <- renderPlot(plot_effort_scatter_sim(best_fit, res$interval_table))
     }
   })
 
