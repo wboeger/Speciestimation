@@ -109,6 +109,8 @@ server <- function(input, output, session) {
         )),
         textInput("taxon_name", "Taxon name (for labeling only)", value = "My taxon"),
         fileInput("upload", "Species inventory (.xlsx or .csv)", accept = c(".xlsx", ".csv")),
+        uiOutput("category_ui"),
+        uiOutput("category_value_ui"),
         helpText("Required columns: scientificName, namePublishedInYear, scientificNameAuthorship",
                  "; parasitic mode additionally requires animalHostNames (semicolon-separated host list)."),
         numericInput("interval_years", "Interval width (years)", value = 5, min = 1, max = 50, step = 1),
@@ -122,6 +124,7 @@ server <- function(input, output, session) {
       ),
       h4("Preview & validation"),
       uiOutput("upload_status"),
+      uiOutput("category_filter_status"),
       DTOutput("preview_table"),
       h4("Aggregated intervals (used for model fitting)"),
       DTOutput("interval_table_out")
@@ -165,17 +168,56 @@ server <- function(input, output, session) {
     }
   })
 
+  # ---- Optional CTFB-style Category filter (phylum/class/.../genus) plus
+  # automatic taxonomicStatus == "NOME_ACEITO" / taxonRank == "ESPECIE"
+  # filtering whenever those columns are present in the uploaded file. ----
+  output$category_ui <- renderUI({
+    req(rv$raw_df)
+    available_ranks <- intersect(CATEGORY_RANK_COLUMNS, names(rv$raw_df))
+    if (length(available_ranks) == 0) return(NULL)
+    selectInput("category_column", "Category (optional taxonomic filter)",
+                choices = c("(none)" = "(none)", stats::setNames(available_ranks, available_ranks)),
+                selected = "(none)")
+  })
+
+  output$category_value_ui <- renderUI({
+    req(rv$raw_df, input$category_column, !identical(input$category_column, "(none)"))
+    col <- input$category_column
+    req(col %in% names(rv$raw_df))
+    values <- sort(unique(stats::na.omit(stringr::str_trim(as.character(rv$raw_df[[col]])))))
+    values <- values[values != ""]
+    selectInput("category_value", paste(col, "value"), choices = values)
+  })
+
+  rv_category <- reactive({
+    req(rv$raw_df)
+    cat_col <- if (is.null(input$category_column)) NULL else input$category_column
+    cat_val <- if (is.null(input$category_value)) NULL else input$category_value
+    apply_category_status_filter(rv$raw_df, category_column = cat_col, category_value = cat_val)
+  })
+
   output$preview_table <- renderDT({
     req(rv$raw_df)
-    datatable(utils::head(rv$raw_df, 20), options = list(scrollX = TRUE, pageLength = 5))
+    df_show <- tryCatch(rv_category()$df, error = function(e) rv$raw_df)
+    datatable(utils::head(df_show, 20), options = list(scrollX = TRUE, pageLength = 5))
+  })
+
+  output$category_filter_status <- renderUI({
+    req(rv$raw_df)
+    cf <- tryCatch(rv_category(), error = function(e) NULL)
+    if (is.null(cf) || length(cf$applied) == 0) return(NULL)
+    div(class = "status-box",
+        sprintf("Category/status filter applied (%s): %d \u2192 %d rows.",
+                paste(cf$applied, collapse = "; "), cf$n_before, cf$n_after))
   })
 
   observe({
     req(rv$raw_df, is.null(rv$upload_error))
+    df_filtered <- tryCatch(rv_category()$df, error = function(e) rv$raw_df)
     sy <- if (is.na(input$start_year)) NULL else input$start_year
     ey <- if (is.na(input$end_year)) NULL else input$end_year
     res <- tryCatch({
-      process_species_data(rv$raw_df, mode = input$mode, interval_years = input$interval_years,
+      process_species_data(df_filtered, mode = input$mode, interval_years = input$interval_years,
                             start_year = sy, end_year = ey)
     }, error = function(e) {
       rv$process_error <- conditionMessage(e)
@@ -211,22 +253,37 @@ server <- function(input, output, session) {
           helpText("Gamma mean = alpha / beta. Set these from your best guess of the total species count and your confidence in it \u2014 there is no default."),
           numericInput("ST_alpha", "alpha (shape)", value = NA, min = 0.001),
           numericInput("ST_beta", "beta (rate)", value = NA, min = 0.00001, step = 0.0001),
-          h5("Prior for log(L0): Normal(mean, sd)"),
-          numericInput("log_L0_mean", "mean", value = 0),
-          numericInput("log_L0_sd", "sd", value = 2, min = 0.01),
           h5("Prior for beta (time trend): Normal(mean, sd)"),
+          helpText("Shared by both trend forms below \u2014 the rate of change in efficiency over time."),
           numericInput("beta_mean", "mean", value = 0),
-          numericInput("beta_sd", "sd", value = 0.1, min = 0.001)
+          numericInput("beta_sd", "sd", value = 0.1, min = 0.001),
+          conditionalPanel(
+            condition = "input.structures && (input.structures.indexOf('host_exp') > -1 || input.structures.indexOf('no_host_exp') > -1)",
+            h5("Prior for log(L0) \u2014 exponential trend: Normal(mean, sd)"),
+            helpText("Used by any selected \u201cexponential trend\u201d structure: L(Y) = L0 \u00b7 e^(\u03b2Y)."),
+            numericInput("log_L0_mean", "mean", value = 0),
+            numericInput("log_L0_sd", "sd", value = 2, min = 0.01)
+          ),
+          conditionalPanel(
+            condition = "input.structures && (input.structures.indexOf('host_linear') > -1 || input.structures.indexOf('no_host_linear') > -1)",
+            h5("Prior for L0 \u2014 linear trend: Normal(mean, sd), L0 > 0"),
+            helpText("Used by any selected \u201clinear trend\u201d structure: L(Y) = L0 + \u03b2Y. L0 is on the natural scale (not logged) \u2014 typically a very small number; see the manual for scaling guidance."),
+            numericInput("L0_mean", "mean", value = 0.001, step = 0.0001),
+            numericInput("L0_sd", "sd", value = 0.01, min = 0.0001, step = 0.0001)
+          )
         ),
         conditionalPanel(condition = "input.run_battery",
           h5("Battery scenarios"),
+          helpText("Each scenario carries priors for BOTH trend forms; whichever your selected structures need gets used."),
           textInput("sc_name", "Scenario name", value = "S1"),
           numericInput("sc_ST_alpha", "S_T Gamma alpha", value = NA),
           numericInput("sc_ST_beta", "S_T Gamma beta", value = NA, step = 0.0001),
-          numericInput("sc_log_L0_mean", "log(L0) mean", value = 0),
-          numericInput("sc_log_L0_sd", "log(L0) sd", value = 2),
-          numericInput("sc_beta_mean", "beta mean", value = 0),
-          numericInput("sc_beta_sd", "beta sd", value = 0.1),
+          numericInput("sc_beta_mean", "beta mean (shared)", value = 0),
+          numericInput("sc_beta_sd", "beta sd (shared)", value = 0.1),
+          numericInput("sc_log_L0_mean", "log(L0) mean (exponential trend)", value = 0),
+          numericInput("sc_log_L0_sd", "log(L0) sd (exponential trend)", value = 2),
+          numericInput("sc_L0_mean", "L0 mean (linear trend)", value = 0.001, step = 0.0001),
+          numericInput("sc_L0_sd", "L0 sd (linear trend)", value = 0.01, min = 0.0001, step = 0.0001),
           actionButton("add_scenario", "Add scenario", class = "btn-secondary"),
           actionButton("clear_scenarios", "Clear all scenarios", class = "btn-outline-danger"),
           tableOutput("scenario_table")
@@ -250,12 +307,20 @@ server <- function(input, output, session) {
   output$structures_ui <- renderUI({
     if (identical(input$mode %||% "parasitic", "parasitic")) {
       checkboxGroupInput("structures", NULL,
-        choices = c("With host covariate" = "host", "Without host covariate" = "no_host"),
-        selected = c("host", "no_host"))
+        choices = c(
+          "Host \u2014 exponential trend" = "host_exp",
+          "Host \u2014 linear trend" = "host_linear",
+          "No host \u2014 exponential trend" = "no_host_exp",
+          "No host \u2014 linear trend" = "no_host_linear"
+        ),
+        selected = c("host_exp", "no_host_exp"))
     } else {
       checkboxGroupInput("structures", NULL,
-        choices = c("Without host covariate" = "no_host"),
-        selected = "no_host")
+        choices = c(
+          "Exponential trend" = "no_host_exp",
+          "Linear trend" = "no_host_linear"
+        ),
+        selected = c("no_host_exp", "no_host_linear"))
     }
   })
 
@@ -264,6 +329,7 @@ server <- function(input, output, session) {
     rv$battery_scenarios[[length(rv$battery_scenarios) + 1]] <- list(
       name = input$sc_name, ST_alpha = input$sc_ST_alpha, ST_beta = input$sc_ST_beta,
       log_L0_mean = input$sc_log_L0_mean, log_L0_sd = input$sc_log_L0_sd,
+      L0_mean = input$sc_L0_mean, L0_sd = input$sc_L0_sd,
       beta_mean = input$sc_beta_mean, beta_sd = input$sc_beta_sd
     )
   })
@@ -284,12 +350,17 @@ server <- function(input, output, session) {
     req(rv$processed, is.null(rv$process_error))
 
     mode <- input$mode
-    Ht <- if (identical(mode, "parasitic")) input$Ht else NULL
-    if (identical(mode, "parasitic") && (is.na(Ht) || Ht <= 0)) {
-      rv$job_error <- "Enter a positive total host-species pool (Ht) before running."
+    structures <- input$structures
+    needs_host <- any(structure_is_host(structures))
+    needs_exp <- any(structure_trend(structures) == "exp")
+    needs_linear <- any(structure_trend(structures) == "linear")
+
+    Ht <- if (needs_host) input$Ht else NULL
+    if (needs_host && (is.na(Ht) || Ht <= 0)) {
+      rv$job_error <- "Enter a positive total host-species pool (Ht) before running \u2014 required by the host structure(s) you selected."
       return()
     }
-    if (length(input$structures) == 0) {
+    if (length(structures) == 0) {
       rv$job_error <- "Select at least one structure to fit."
       return()
     }
@@ -305,7 +376,7 @@ server <- function(input, output, session) {
         return()
       }
       spec <- list(
-        job_type = "battery", mode = mode, structures = input$structures,
+        job_type = "battery", mode = mode, structures = structures,
         scenarios = rv$battery_scenarios,
         stan_data_base = rv$processed$stan_data_base, Ht = Ht,
         interval_table = rv$processed$interval_table,
@@ -317,11 +388,20 @@ server <- function(input, output, session) {
         rv$job_error <- "Enter a valid S_T Gamma prior (alpha > 0, beta > 0) before running."
         return()
       }
+      if (needs_exp && (is.na(input$log_L0_mean) || is.na(input$log_L0_sd) || input$log_L0_sd <= 0)) {
+        rv$job_error <- "Enter a valid log(L0) prior (exponential trend) before running."
+        return()
+      }
+      if (needs_linear && (is.na(input$L0_mean) || is.na(input$L0_sd) || input$L0_sd <= 0)) {
+        rv$job_error <- "Enter a valid L0 prior (linear trend) before running."
+        return()
+      }
       prior <- list(ST_alpha = input$ST_alpha, ST_beta = input$ST_beta,
                     log_L0_mean = input$log_L0_mean, log_L0_sd = input$log_L0_sd,
+                    L0_mean = input$L0_mean, L0_sd = input$L0_sd,
                     beta_mean = input$beta_mean, beta_sd = input$beta_sd)
       spec <- list(
-        job_type = "single", mode = mode, structures = input$structures,
+        job_type = "single", mode = mode, structures = structures,
         prior = prior, stan_data_base = rv$processed$stan_data_base, Ht = Ht,
         interval_table = rv$processed$interval_table,
         interval_years = input$interval_years,
@@ -376,24 +456,41 @@ server <- function(input, output, session) {
     }
     res <- species_task$result()
     if (identical(res$job_type, "single")) {
-      tagList(lapply(names(res$per_structure), function(st) {
-        label <- if (st == "host") "With host covariate" else "Without host covariate"
-        r <- res$per_structure[[st]]
+      comparison_section <- if (!is.null(res$comparison_table)) {
         tagList(
-          h3(label),
-          tableOutput(paste0("summary_", st)),
+          h3("Structure comparison"),
+          p("You fit ", length(res$per_structure), " structures on the same data \u2014 ranked below by LOO-ELPD (higher/less negative is better). This is how the app lets the observed Si-vs-effort-vs-time relationship indicate which formula (linear or exponential trend, with or without the host term) fits best, rather than requiring a guess."),
+          p(strong("Best-supported: "), structure_label(res$best_model_label)),
+          DTOutput("single_cmp_table"),
           fluidRow(
-            column(6, plotOutput(paste0("post_ST_", st))),
-            column(6, plotOutput(paste0("trace_ST_", st)))
-          ),
-          plotOutput(paste0("ppc_", st)),
-          fluidRow(
-            column(6, plotOutput(paste0("pct_", st))),
-            column(6, plotOutput(paste0("extrap_", st)))
+            column(6, plotOutput("single_cmp_loo_plot")),
+            column(6, plotOutput("single_cmp_scores_plot"))
           ),
           hr()
         )
-      }))
+      } else {
+        NULL
+      }
+      tagList(
+        comparison_section,
+        lapply(names(res$per_structure), function(st) {
+          r <- res$per_structure[[st]]
+          tagList(
+            h3(structure_label(st)),
+            tableOutput(paste0("summary_", st)),
+            fluidRow(
+              column(6, plotOutput(paste0("post_ST_", st))),
+              column(6, plotOutput(paste0("trace_ST_", st)))
+            ),
+            plotOutput(paste0("ppc_", st)),
+            fluidRow(
+              column(6, plotOutput(paste0("pct_", st))),
+              column(6, plotOutput(paste0("extrap_", st)))
+            ),
+            hr()
+          )
+        })
+      )
     } else {
       tagList(
         h3("Sensitivity battery results"),
@@ -421,6 +518,11 @@ server <- function(input, output, session) {
           st_median <- r$summary$median[r$summary$parameter == "ST"]
           output[[paste0("extrap_", st_)]] <- renderPlot(plot_extrapolation(res$interval_table, r$extrapolation, st_median))
         })
+      }
+      if (!is.null(res$comparison_table)) {
+        output$single_cmp_table <- renderDT(datatable(res$comparison_table, options = list(scrollX = TRUE)))
+        output$single_cmp_loo_plot <- renderPlot(plot_loo_comparison(res$comparison_table))
+        output$single_cmp_scores_plot <- renderPlot(plot_predictive_scores(res$comparison_table))
       }
     } else {
       output$battery_table <- renderDT(datatable(res$comparison_table, options = list(scrollX = TRUE)))

@@ -38,11 +38,10 @@ if (future::supportsMulticore()) {
 }
 
 # --- Compile (or load pre-compiled) Stan models once, shared by all sessions.
+# Four structural combinations: host on/off (needs a host inventory + Ht)
+# crossed with the efficiency-trend form (exponential vs. linear over time).
 STAN_DIR <- "stan"
-HOST_STAN_FILE <- file.path(STAN_DIR, "species_model_host.stan")
-NO_HOST_STAN_FILE <- file.path(STAN_DIR, "species_model_no_host.stan")
-HOST_RDS <- file.path(STAN_DIR, "species_model_host.rds")
-NO_HOST_RDS <- file.path(STAN_DIR, "species_model_no_host.rds")
+STRUCTURE_KEYS <- c("host_exp", "host_linear", "no_host_exp", "no_host_linear")
 
 load_or_compile <- function(rds_path, stan_path) {
   if (file.exists(rds_path)) {
@@ -53,10 +52,12 @@ load_or_compile <- function(rds_path, stan_path) {
   }
 }
 
-COMPILED_MODELS <- list(
-  host = load_or_compile(HOST_RDS, HOST_STAN_FILE),
-  no_host = load_or_compile(NO_HOST_RDS, NO_HOST_STAN_FILE)
-)
+COMPILED_MODELS <- setNames(lapply(STRUCTURE_KEYS, function(k) {
+  load_or_compile(
+    file.path(STAN_DIR, paste0("species_model_", k, ".rds")),
+    file.path(STAN_DIR, paste0("species_model_", k, ".stan"))
+  )
+}), STRUCTURE_KEYS)
 
 # --- Global FIFO queue bookkeeping, shared across all sessions in this process.
 queue_state <- local({

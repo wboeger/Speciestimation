@@ -1,12 +1,27 @@
-// species_model_no_host.stan
+// species_model_no_host_linear.stan
 //
-// Generic Bayesian species-discovery model WITHOUT a host-availability covariate.
-// Used for free-living taxa (no meaningful host pool) or as the structural
-// alternative to species_model_host.stan for model comparison in parasitic taxa.
+// Generic Bayesian species-discovery model WITHOUT a host-availability
+// covariate, with a LINEAR (additive) trend in taxonomic efficiency over
+// time: L_i = L0 + beta * Yi. This is the exact form Pimm et al. (2010) and
+// Joppa et al. (2011) used for species accumulation without host
+// information: Si/[Ti(ST-cumSi)] = a + b*Yi, as applied to Actinopterygii
+// in Boeger et al. (Zoologia, ZOOL-2026-0012.R1). See
+// species_model_no_host_exp.stan for the alternative multiplicative-trend
+// assumption. Fit both and compare via LOO/CRPS to let the data indicate
+// which trend form better describes how effort and discovery rate relate
+// over time.
 //
 // Discovery-rate structure:
-//   log(lambda_i) = (log_L0 + beta * Yi) + log(ST - cumSi_i) + log1p(Ti_i)
+//   lambda_i = Ti_i * (ST - cumSi_i) * (L0 + beta * Yi)
 //   Si_i ~ Poisson(lambda_i)
+//
+// L0 + beta*Yi is floored at a small positive value to keep lambda_i a valid
+// (positive) Poisson rate even where the linear trend would otherwise cross
+// zero within the observed time range.
+//
+// Implementation note: log(Ti) is evaluated as log1p(Ti) = log(1 + Ti), a
+// standard numerical safeguard keeping the term finite for any interval with
+// zero active taxonomists; negligible whenever Ti is not tiny.
 
 data {
   int<lower=1> N;                        // number of time intervals
@@ -19,24 +34,24 @@ data {
   // user-supplied prior parameters
   real<lower=0> ST_prior_alpha;
   real<lower=0> ST_prior_beta;
-  real log_L0_prior_mean;
-  real<lower=0> log_L0_prior_sd;
+  real L0_prior_mean;
+  real<lower=0> L0_prior_sd;
   real beta_prior_mean;
   real<lower=0> beta_prior_sd;
 }
 
 parameters {
   real<lower=ST_lower_bound> ST;         // total number of species expected to exist
-  real log_L0;                           // baseline log discovery efficiency
-  real beta;                             // trend in discovery efficiency over time
+  real<lower=0> L0;                      // baseline discovery efficiency (natural scale, at Yi = 0)
+  real beta;                             // linear trend in discovery efficiency over time
 }
 
 model {
   ST ~ gamma(ST_prior_alpha, ST_prior_beta);
-  log_L0 ~ normal(log_L0_prior_mean, log_L0_prior_sd);
+  L0 ~ normal(L0_prior_mean, L0_prior_sd);
   beta ~ normal(beta_prior_mean, beta_prior_sd);
 
-  vector[N] log_Li = log_L0 + beta * Yi;
+  vector[N] log_Li = log(fmax(rep_vector(1e-9, N), L0 + beta * Yi));
   vector[N] log_remaining_species = log(fmax(rep_vector(1e-9, N), ST - cumSi));
   vector[N] log_expected_count = log_Li + log_remaining_species + log1p(to_vector(Ti));
 
@@ -48,7 +63,7 @@ generated quantities {
   vector[N] log_lik;                     // pointwise log-lik (for LOO)
 
   {
-    vector[N] log_Li = log_L0 + beta * Yi;
+    vector[N] log_Li = log(fmax(rep_vector(1e-9, N), L0 + beta * Yi));
     vector[N] log_remaining_species = log(fmax(rep_vector(1e-9, N), ST - cumSi));
     vector[N] log_expected_count = log_Li + log_remaining_species + log1p(to_vector(Ti));
 

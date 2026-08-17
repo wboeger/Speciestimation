@@ -50,6 +50,45 @@ split_authors <- function(authorship) {
   parts
 }
 
+# CTFB (Cat\u00e1logo Taxon\u00f4mico da Fauna do Brasil) Darwin-Core-style taxonomic
+# hierarchy columns available for the optional "Category" filter below.
+CATEGORY_RANK_COLUMNS <- c(
+  "phylum", "class", "subClass", "infraClass", "superOrder", "order", "subOrder",
+  "infraOrder", "superFamily", "family", "subFamily", "tribe", "subTribe",
+  "genus", "subGenus"
+)
+
+#' Optional pre-filter for full CTFB-style exports: restrict to one taxonomic
+#' category/value (e.g. family = "Dactylogyridae") and, whenever the relevant
+#' columns are present, to accepted names at species rank
+#' (taxonomicStatus == "NOME_ACEITO", taxonRank == "ESPECIE"). Any filter
+#' whose column is absent from `df` is silently skipped, so this works
+#' unchanged for minimal, non-CTFB spreadsheets too.
+#'
+#' @return list(df = filtered data.frame, n_before, n_after, applied = character vector of filters used)
+apply_category_status_filter <- function(df, category_column = NULL, category_value = NULL) {
+  applied <- character(0)
+  n_before <- nrow(df)
+
+  if (!is.null(category_column) && !identical(category_column, "") && !identical(category_column, "(none)") &&
+      !is.null(category_value) && !identical(category_value, "") &&
+      category_column %in% names(df)) {
+    df <- df[!is.na(df[[category_column]]) &
+               stringr::str_trim(as.character(df[[category_column]])) == stringr::str_trim(category_value), , drop = FALSE]
+    applied <- c(applied, sprintf('%s = "%s"', category_column, category_value))
+  }
+  if ("taxonomicStatus" %in% names(df)) {
+    df <- df[!is.na(df$taxonomicStatus) & df$taxonomicStatus == "NOME_ACEITO", , drop = FALSE]
+    applied <- c(applied, 'taxonomicStatus = "NOME_ACEITO"')
+  }
+  if ("taxonRank" %in% names(df)) {
+    df <- df[!is.na(df$taxonRank) & df$taxonRank == "ESPECIE", , drop = FALSE]
+    applied <- c(applied, 'taxonRank = "ESPECIE"')
+  }
+
+  list(df = df, n_before = n_before, n_after = nrow(df), applied = applied)
+}
+
 #' Process a raw species-inventory data frame into interval-aggregated Stan data.
 #'
 #' @param df raw uploaded data frame

@@ -1,14 +1,22 @@
-// species_model_host.stan
+// species_model_no_host_exp.stan
 //
-// Generic Bayesian species-discovery model WITH a host-availability covariate.
-// Adapted from the flexible Dactylogyridae model (Boeger et al., Zoologia,
-// ZOOL-2026-0012.R1), generalized for any parasitic taxon with a known/estimated
-// host pool. All priors are passed in from the app -- no taxon-specific defaults
-// are baked into this file.
+// Generic Bayesian species-discovery model WITHOUT a host-availability
+// covariate, with an EXPONENTIAL (multiplicative) trend in taxonomic
+// efficiency over time: L_i = L0 * exp(beta * Yi). Used for free-living
+// taxa (no meaningful host pool) or as a structural alternative for
+// parasitic taxa. See species_model_no_host_linear.stan for the alternative
+// additive-trend assumption used by Pimm et al. (2010)/Joppa et al. (2011)
+// for the no-host case. Fit both and compare via LOO/CRPS to let the data
+// indicate which trend form better describes how effort and discovery rate
+// relate over time.
 //
 // Discovery-rate structure:
-//   log(lambda_i) = (log_L0 + beta * Yi) + log(ST - cumSi_i) + log(Ht - cumHi_i) + log1p(Ti_i)
+//   log(lambda_i) = (log_L0 + beta * Yi) + log(ST - cumSi_i) + log(Ti_i)
 //   Si_i ~ Poisson(lambda_i)
+//
+// Implementation note: log(Ti) is evaluated as log1p(Ti) = log(1 + Ti), a
+// standard numerical safeguard keeping the term finite for any interval with
+// zero active taxonomists; negligible whenever Ti is not tiny.
 
 data {
   int<lower=1> N;                        // number of time intervals
@@ -16,8 +24,6 @@ data {
   array[N] int<lower=0> Ti;              // taxonomists (effort) active per interval
   vector[N] Yi;                          // centered interval end-year
   vector[N] cumSi;                       // cumulative species described BEFORE interval i
-  vector[N] cumHi;                       // cumulative hosts recorded BEFORE interval i
-  real<lower=0> Ht;                      // total known/expected host species pool
   real<lower=0> ST_lower_bound;          // ST must exceed the observed cumulative total
 
   // user-supplied prior parameters
@@ -32,7 +38,7 @@ data {
 parameters {
   real<lower=ST_lower_bound> ST;         // total number of species expected to exist
   real log_L0;                           // baseline log discovery efficiency
-  real beta;                             // trend in discovery efficiency over time
+  real beta;                             // exponential trend in discovery efficiency over time
 }
 
 model {
@@ -42,8 +48,7 @@ model {
 
   vector[N] log_Li = log_L0 + beta * Yi;
   vector[N] log_remaining_species = log(fmax(rep_vector(1e-9, N), ST - cumSi));
-  vector[N] log_remaining_hosts = log(fmax(rep_vector(1e-9, N), Ht - cumHi));
-  vector[N] log_expected_count = log_Li + log_remaining_species + log_remaining_hosts + log1p(to_vector(Ti));
+  vector[N] log_expected_count = log_Li + log_remaining_species + log1p(to_vector(Ti));
 
   Si ~ poisson_log(log_expected_count);
 }
@@ -55,8 +60,7 @@ generated quantities {
   {
     vector[N] log_Li = log_L0 + beta * Yi;
     vector[N] log_remaining_species = log(fmax(rep_vector(1e-9, N), ST - cumSi));
-    vector[N] log_remaining_hosts = log(fmax(rep_vector(1e-9, N), Ht - cumHi));
-    vector[N] log_expected_count = log_Li + log_remaining_species + log_remaining_hosts + log1p(to_vector(Ti));
+    vector[N] log_expected_count = log_Li + log_remaining_species + log1p(to_vector(Ti));
 
     for (i in 1:N) {
       real capped_log_rate = fmin(log_expected_count[i], 20.79);

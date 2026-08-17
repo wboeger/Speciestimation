@@ -29,16 +29,18 @@ et al. (2010) and Joppa et al. (2011).
 species-description records (any parasitic or free-living group), and the app
 fits the model to *your* data with *your* priors.
 
-Two modes are supported:
+Two independent modeling choices combine into up to **four candidate model
+structures**, and the app fits and statistically compares as many of them as
+you select — letting your data, not a guess, indicate which formula
+describes it best (§2.5):
 
-- **Parasitic** — includes an optional host-availability covariate, for
-  groups with a definable, boundable host pool (e.g., a parasite family and
-  its host order).
-- **Free-living** — no host covariate; appropriate for any taxon without a
-  meaningful host-limitation term (e.g., free-living fish, insects, plants).
+- **Host term**: on (parasitic mode, with a defined host pool) or off
+  (free-living mode, or parasitic data without a usable host pool).
+- **Efficiency-trend form**: exponential or linear change in taxonomic
+  efficiency over time (§2.3).
 
 No dataset, credential, or analysis result is stored by the application beyond
-your browser session. See §7 ("Data Handling & Privacy") for details.
+your browser session. See §6 ("Data Handling & Privacy") for details.
 
 # Scientific Background & Method
 
@@ -47,41 +49,36 @@ your browser session. See §7 ("Data Handling & Privacy") for details.
 The number of *new* species described in time interval $i$, $S_i$, is modeled
 as a random draw from a Poisson process whose rate depends on (a) how many
 species remain to be discovered, (b) how much taxonomic effort was applied,
-and, for parasitic taxa, (c) how many host species remain available to be
-surveyed:
+(c) for parasitic taxa, how many host species remain available to be
+surveyed, and (d) a trend in baseline taxonomic efficiency over time:
 
 $$
-\log \lambda_i \;=\; \underbrace{(\log L_0 + \beta \cdot Y_i)}_{\text{taxonomic efficiency at time } Y_i}
+\log \lambda_i \;=\; \underbrace{\log L_i}_{\text{efficiency at time } Y_i}
 \;+\; \underbrace{\log(S_T - \text{cumS}_i)}_{\text{species remaining}}
-\;+\; \underbrace{\log(H_t - \text{cumH}_i)}_{\text{hosts remaining (parasitic mode only)}}
+\;+\; \underbrace{\log(H_t - \text{cumH}_i)}_{\text{hosts remaining (host structures only)}}
 \;+\; \underbrace{\log T_i}_{\text{effort}}
-$$
-
-$$
+\qquad
 S_i \sim \text{Poisson}(\lambda_i)
 $$
 
-This follows the discovery-rate model of Pimm et al. (2010) and Joppa et al.
-(2011) as adapted in Boeger et al. (submitted): the rate of new discoveries is
-proportional to taxonomist effort ($T_i$) and to the pool of species (and, for
-parasites, hosts) not yet found, with a log-linear trend in baseline
-efficiency. *Implementation note:* to keep $\log T_i$ finite for any interval
-with zero active taxonomists, the fitted model evaluates $\log(1+T_i)$ rather
-than $\log T_i$ — a standard Laplace-style safeguard that is numerically
-indistinguishable from $\log T_i$ whenever $T_i \geq $ a few, and only changes
-behavior for empty (zero-effort) intervals, where it keeps their contribution
-finite instead of $-\infty$.
+$L_i$, the efficiency term, takes one of two forms depending on your chosen
+**trend form** — see §2.3 for both exact equations. *Implementation note:* to
+keep $\log T_i$ finite for any interval with zero active taxonomists, the
+fitted model evaluates $\log(1+T_i)$ rather than $\log T_i$ — a standard
+Laplace-style safeguard that is numerically indistinguishable from $\log T_i$
+whenever $T_i \geq$ a few, and only changes behavior for empty (zero-effort)
+intervals, where it keeps their contribution finite instead of $-\infty$.
 
 | Symbol | Meaning |
 |---|---|
 | $S_T$ | **Total number of species expected to exist** in the group — the key quantity of interest. |
-| $L_0$ | Baseline taxonomic discovery efficiency (species described per unit of remaining diversity, per taxonomist, at the reference year). Fit on the log scale as $\log L_0$. |
+| $L_0$ | Baseline taxonomic discovery efficiency at the reference year (parameterization depends on trend form — §2.3). |
 | $\beta$ | Trend in discovery efficiency over time. Positive = taxonomists are getting relatively more efficient at finding remaining species over time; negative = the opposite (e.g., the "easy" species were found first). |
-| $Y_i$ | Centered end-year of interval $i$ (years minus the mean year, so the intercept $L_0$ refers to the middle of your time series, not year zero). |
+| $Y_i$ | Centered end-year of interval $i$ (years minus the mean year, so $L_0$ refers to the middle of your time series, not year zero). |
 | $\text{cumS}_i$ | Cumulative species described **before** interval $i$ began. |
 | $T_i$ | Number of unique taxonomists (authors) active in interval $i$ — a proxy for research effort. |
-| $H_t$ | Total known/expected host-species pool (parasitic mode only) — a fixed number you supply, not fitted. |
-| $\text{cumH}_i$ | Cumulative unique host species recorded **before** interval $i$ (parasitic mode only; computed automatically from your `animalHostNames` column). |
+| $H_t$ | Total known/expected host-species pool (host structures only) — a fixed number you supply, not fitted. |
+| $\text{cumH}_i$ | Cumulative unique host species recorded **before** interval $i$ (host structures only; computed automatically from your `animalHostNames` column). |
 
 Intuitively: as more species are described ($\text{cumS}_i$ grows toward
 $S_T$), the pool of undescribed species shrinks, and the expected discovery
@@ -103,42 +100,72 @@ not supply a default $S_T$ prior — you must set one explicitly**, because a
 sensible default does not exist across arbitrary taxa. See §4.2 for practical
 guidance on choosing `alpha`/`beta`.
 
-The $\log L_0$ and $\beta$ priors are weaker (default: Normal(0, 2) and
-Normal(0, 0.1) respectively) and rarely need adjustment unless you have strong
-prior knowledge about the trend in discovery efficiency.
+The efficiency-intercept and $\beta$ priors are weaker (defaults provided —
+§4.2/§2.3) and rarely need adjustment unless you have strong prior knowledge
+about the trend in discovery efficiency.
 
-## Structural variants: host vs. no-host
+## Structural variants: host term and efficiency-trend form
 
-- **Host structure** (parasitic mode only) adds the $\log(H_t - \text{cumH}_i)$
-  term, reflecting the hypothesis that parasite discovery is partly
-  contingent on finding new host species to examine. You supply $H_t$ (a
-  single fixed number: your best estimate of the total host-species pool)
-  and the app computes $\text{cumH}_i$ automatically from the
-  `animalHostNames` column.
-- **No-host structure** omits that term. It is the only option in free-living
-  mode, and is also available in parasitic mode so you can directly compare
-  whether the host covariate improves the model for your data (as done in
-  the source manuscript, where host models were found to outperform no-host
-  models).
+**Host term** (on/off): the *host* structures add the
+$\log(H_t - \text{cumH}_i)$ term, reflecting the hypothesis that parasite
+discovery is partly contingent on finding new host species to examine. You
+supply $H_t$ (a single fixed number: your best estimate of the total
+host-species pool) and the app computes $\text{cumH}_i$ automatically from the
+`animalHostNames` column. The *no-host* structures omit that term; they are
+the only option in free-living mode.
+
+**Efficiency-trend form** (exponential/linear): the two published parent
+models use two different assumptions about how baseline efficiency $L_i$
+evolves over time:
+
+- **Exponential trend** (used for Dactylogyridae in Boeger et al.):
+  $$L_i = L_0 \cdot e^{\beta Y_i}, \qquad\text{i.e. fit on the log scale as } \log L_i = \log L_0 + \beta Y_i.$$
+  Efficiency changes by a constant *proportion* per unit time and can never
+  turn negative, whatever $\beta$ is.
+- **Linear trend** (the original Pimm et al. 2010 / Joppa et al. 2011 form,
+  used for Actinopterygii in Boeger et al.):
+  $$L_i = L_0 + \beta Y_i.$$
+  Efficiency changes by a constant *absolute amount* per unit time; the app
+  floors $L_i$ at a small positive value so the Poisson rate stays valid even
+  where the trend would otherwise cross zero within your observed range.
+
+Crossing these two axes gives **four selectable structures**: *host +
+exponential*, *host + linear*, *no-host + exponential*, *no-host + linear*
+(the last two are the only options in free-living mode). Fit two or more of
+them together and the app ranks them for you (§2.5) — this is how "which
+formula fits my data" gets answered empirically rather than guessed.
+
+> **Practical note on numerical stability.** The *host + linear* combination
+> multiplies two large, independently varying "remaining pool" terms
+> ($S_T - \text{cumS}_i$ and $H_t - \text{cumH}_i$) by a small additive
+> efficiency term, which can produce a harder-to-sample posterior (elevated
+> `Rhat`, divergent transitions) than the other three combinations,
+> especially with short or noisy time series. If you see poor convergence
+> for this specific combination, try: tighter/better-centered priors for
+> $L_0$ (order-of-magnitude guidance: roughly
+> $\text{mean}(S_i) / [\text{mean}(T_i) \cdot \text{mean}(S_T-\text{cumS}_i) \cdot \text{mean}(H_t-\text{cumH}_i)]$),
+> "Full precision" iterations, or compare against the *host + exponential*
+> structure instead (which does not share this issue and is what the source
+> manuscript uses for its host-covariate model).
 
 ## Model fitting
 
 Models are fit with Hamiltonian Monte Carlo (Stan, via `rstan`), sampling
-$S_T$, $\log L_0$, and $\beta$ from their joint posterior. You control the
-number of iterations, warmup, and chains (§4.4); more iterations give more
-stable estimates at the cost of runtime.
+$S_T$, the efficiency intercept, and $\beta$ from their joint posterior. You
+control the number of iterations, warmup, and chains (§4.3); more iterations
+give more stable estimates at the cost of runtime.
 
 **Convergence diagnostics** (`Rhat`, `n_eff`) are reported alongside every
 parameter estimate. As a rule of thumb, `Rhat` should be $\le 1.01$ and
 `n_eff` should be in the hundreds or more; if not, increase iterations/warmup
-or reconsider the priors.
+or reconsider the priors (see the numerical-stability note in §2.3).
 
-## Comparing models: the sensitivity battery
+## Comparing models: letting the data decide the formula
 
-A single run fits **one** prior specification with **one or two** structures.
-The **sensitivity battery** (§4.3) instead lets you define several prior
-scenarios and fits every scenario against every selected structure, then
-ranks all resulting models by:
+Whenever you fit **two or more structures together** — which happens by
+default on Tab 2 (the app pre-selects more than one structure), and always in
+the sensitivity battery — the app produces a ranked comparison in addition to
+each structure's individual diagnostics, using:
 
 - **LOO-ELPD** (Leave-One-Out Expected Log Predictive Density, via the `loo`
   package): a fully Bayesian estimate of each model's out-of-sample
@@ -147,15 +174,21 @@ ranks all resulting models by:
   Error) of the posterior-predictive distribution against your observed
   $S_i$ time series (via `scoringRules`). Lower is better for both.
 
-Reporting results across multiple priors, rather than a single arbitrarily
-chosen one, is standard practice for demonstrating that your conclusions are
-not an artifact of one prior choice — this is exactly the analysis performed
-in the source manuscript across six prior scenarios.
+This is the app's answer to "should I use a linear or exponential trend, and
+should I include the host term?" — fit the candidates you want to compare
+(any subset of the four structures) in a single run, and read off the
+best-supported one, rather than assuming an answer in advance.
+
+The **sensitivity battery** (§4.3) extends the same comparison across
+*multiple prior scenarios* as well, so you can additionally confirm your
+conclusions are not an artifact of one prior choice — this is exactly the
+analysis performed in the source manuscript across six prior scenarios.
 
 # Data Requirements
 
 Upload an `.xlsx` or `.csv` file. Column names must match **exactly** (case
-sensitive). Any other columns in your file are ignored.
+sensitive). Any other columns in your file are ignored, except for the
+optional Category-filter columns described below.
 
 ## Always required
 
@@ -171,17 +204,35 @@ sensitive). Any other columns in your file are ignored.
 |---|---|---|
 | `animalHostNames` | text | Semicolon-separated list of host species names for that record, e.g. `"Hostus one; Hostus two"`. Used to compute the cumulative unique-host time series ($\text{cumH}_i$). |
 
+## Optional: Category filter (CTFB-style exports)
+
+If your file is a full taxonomic export (e.g. from the Catálogo Taxonômico da
+Fauna do Brasil, CTFB) with additional Darwin-Core-style columns, you can
+upload it **unfiltered** and let the app do the filtering for you:
+
+| Column | Effect |
+|---|---|
+| Any of `phylum`, `class`, `subClass`, `infraClass`, `superOrder`, `order`, `subOrder`, `infraOrder`, `superFamily`, `family`, `subFamily`, `tribe`, `subTribe`, `genus`, `subGenus` | If present, Tab 1 shows a **Category** dropdown letting you pick one of these rank columns and a value found in your data (e.g. `family = "Dactylogyridae"`); the app restricts to rows matching that value before doing anything else. |
+| `taxonomicStatus` | If present, automatically restricted to `taxonomicStatus == "NOME_ACEITO"` (accepted names only — synonyms and other statuses are excluded). Applied silently, no toggle needed. |
+| `taxonRank` | If present, automatically restricted to `taxonRank == "ESPECIE"` (species-rank records only — genus-level, "sp.", "aff.", etc. are excluded). Applied silently, no toggle needed. |
+
+None of these three filters is required — if your spreadsheet is already a
+clean, pre-filtered list of species records (the minimal schema above), none
+of these columns need to exist and nothing changes. A status box on Tab 1
+reports exactly which filters were applied and how many rows they removed.
+
 ## Data preparation tips
 
 - One row per species record (not per specimen or per locality).
-- Filter your source data to the taxon and time window you want modeled
-  *before* uploading — the app does not filter by higher taxonomy; it treats
-  every row in the uploaded file as belonging to the target group.
+- If you are not using the Category filter, pre-filter your source data to
+  the taxon and time window you want modeled *before* uploading — the app
+  otherwise treats every row in the uploaded file as belonging to the target
+  group.
 - Rows with a missing/non-numeric year, missing species name, or (in
   parasitic mode) missing host names are dropped automatically, with the
   cleaned row count shown after upload.
 - If your data spans a very long time range with few early records, consider
-  setting a later **start year** (§4.1) to exclude a sparse, uninformative
+  setting a later **start year** (§4.2) to exclude a sparse, uninformative
   tail that can destabilize the fit.
 
 # Using the App — Step by Step
@@ -199,32 +250,43 @@ accounts; anyone with the password has full access.
    downloadable report.
 3. **Upload** your `.xlsx`/`.csv` file. A validation banner confirms the row
    count or reports the first missing/invalid column.
-4. Set the **interval width** (in years) that species counts are aggregated
+4. If your file has recognizable taxonomic-hierarchy columns, an optional
+   **Category** dropdown appears — pick a rank (e.g. `family`) and a value
+   (e.g. `Dactylogyridae`) to restrict the uploaded data to that group; a
+   status box reports the effect, along with any automatic
+   `taxonomicStatus`/`taxonRank` filtering (§3.3).
+5. Set the **interval width** (in years) that species counts are aggregated
    into (e.g., 3 or 5 years — matching the interval width used in the
    Dactylogyridae/Actinopterygii analyses). Smaller intervals give more data
    points but noisier per-interval counts; larger intervals smooth noise but
    reduce the number of time points available to fit the trend.
-5. Optionally set a **start year** / **end year** to restrict the modeled
+6. Optionally set a **start year** / **end year** to restrict the modeled
    window (defaults to the full range present in your data).
-6. In parasitic mode, enter **$H_t$** — your best estimate of the total host
-   species pool, as a plain number (not fitted).
-7. Review the **aggregated interval table** at the bottom of the page — this
+7. In parasitic mode, enter **$H_t$** — your best estimate of the total host
+   species pool, as a plain number (not fitted). Only required if you plan
+   to fit a host structure.
+8. Review the **aggregated interval table** at the bottom of the page — this
    is the exact $S_i$/$T_i$/$\text{cumS}_i$(/$\text{cumH}_i$) time series that
    will be passed to the model. Check it for implausible jumps or gaps before
    proceeding.
 
 ## Tab 2 — Priors & Run
 
-1. **Structures to fit**: in parasitic mode, choose "with host covariate",
-   "without", or both (both is recommended, to let the LOO/CRPS comparison
-   tell you which fits your data better); free-living mode offers only the
-   no-host structure.
+1. **Structures to fit**: up to four checkboxes (parasitic mode) or two
+   (free-living mode) — see §2.3. The app pre-selects more than one so a
+   comparison (§2.5) is produced by default; uncheck down to a single
+   structure if you only want one model's diagnostics.
 2. **Single run vs. battery**: leave "Run full sensitivity battery" unchecked
-   for a fast, single-prior run (recommended for initial exploration).
-   Check it to instead define and compare several prior scenarios (§4.3).
+   for a fast run with one prior specification (recommended for initial
+   exploration). Check it to instead define and compare several full prior
+   scenarios (step 4 below).
 3. **Single-run priors**: enter the Gamma($\alpha$, $\beta$) prior for $S_T$
-   (no default — see §2.2 and the guidance box below), and optionally adjust
-   the $\log L_0$ and $\beta$ priors (weak defaults provided).
+   (no default — see §2.2 and the guidance box below) and the $\beta$
+   (trend) prior, shared by both trend forms. Two more prior blocks appear
+   *only* for the trend form(s) your selected structures actually need:
+   log($L_0$) (exponential trend) and/or $L_0$ (linear trend, natural scale
+   — typically a very small number; see the numerical-stability note in
+   §2.3 for scaling guidance).
 
    > **Choosing $\alpha$/$\beta$ for the $S_T$ prior:** the Gamma
    > distribution's mean is $\alpha/\beta$. A simple approach: pick a rough
@@ -237,9 +299,11 @@ accounts; anyone with the password has full access.
    > cumulative species count, so $S_T$ can never be estimated below what
    > you've already described.
 
-4. **Battery scenarios**: fill in the scenario form (name + all four prior
-   parameters) and click "Add scenario"; repeat for each scenario you want
-   compared. "Clear all scenarios" resets the list.
+4. **Battery scenarios**: fill in the scenario form (name, shared $S_T$/
+   $\beta$ priors, plus both the exponential-trend and linear-trend
+   efficiency priors — whichever your selected structures need for that
+   scenario gets used) and click "Add scenario"; repeat for each scenario
+   you want compared. "Clear all scenarios" resets the list.
 5. **MCMC settings**: default iterations (4000) and warmup (2000) with 4
    chains are adequate for exploration; check "Full precision" (20000/10000)
    for a final, publication-quality run once you're satisfied with your setup
@@ -251,11 +315,11 @@ accounts; anyone with the password has full access.
 
 ## Tab 3 — Results
 
-For a **single run**, each fitted structure ("with"/"without host
-covariate") shows:
+Whichever structures you fit, each shows:
 
 - **Parameter table**: mean, 95% credible interval, and convergence
-  diagnostics (`Rhat`, `n_eff`) for $S_T$, $\log L_0$, $L_0$, and $\beta$.
+  diagnostics (`Rhat`, `n_eff`) for $S_T$, the efficiency parameter(s), and
+  $\beta$.
 - **Posterior histogram** and **trace plot** for $S_T$ — the trace plot
   should look like a "hairy caterpillar" with no trend or stuck chains; if
   it doesn't, increase iterations/warmup.
@@ -270,9 +334,11 @@ covariate") shows:
   forward projection (with 95% credible band) assuming future taxonomic
   effort continues at the recent average level.
 
-For a **battery run**: a ranked comparison table (every scenario × structure,
-with $S_T$ estimates, LOO-ELPD, CRPS, MAE), plus comparison plots. The
-best-supported model by LOO-ELPD is called out explicitly.
+If **two or more structures** were fit — the default for a single run, and
+always for a battery — a **Structure comparison** section appears first,
+with a ranked table (LOO-ELPD, CRPS, MAE, $S_T$ estimate per structure/
+scenario) and comparison plots, with the best-supported structure called out
+explicitly (§2.5).
 
 ## Tab 4 — Download Report
 
@@ -281,10 +347,11 @@ parameter table(s), the methods description, and a data-handling notice —
 built fresh from your current results, never stored server-side. Useful for
 supplementary material, sharing with collaborators, or your own records.
 
-## About
+## Manual / About
 
-A short in-app summary of scope and data handling; this manual is the
-complete reference.
+The Manual tab offers this document as a downloadable, print-quality PDF
+(math and Greek letters render as real typeset LaTeX, not browser-dependent
+web fonts). About is a short in-app summary of scope and data handling.
 
 # Interpreting the Diagnostic Plots (Reference)
 
@@ -292,11 +359,11 @@ complete reference.
 |---|---|
 | Posterior histogram ($S_T$) | A unimodal, reasonably concentrated distribution. A histogram that looks identical to your prior means the data contributed little information — consider a longer/less sparse time series or a more informative prior. |
 | Trace plot | Overlapping, stationary "hairy caterpillar" traces across chains, no drift or sudden jumps. |
-| Simulated vs. observed | Red observed line inside the blue simulation envelope, most of the time. Persistent misses indicate model misspecification (e.g., missing the host term, or an interval width that's too coarse/fine). |
+| Simulated vs. observed | Red observed line inside the blue simulation envelope, most of the time. Persistent misses indicate model misspecification (e.g., wrong host/trend-form choice, or an interval width that's too coarse/fine). |
 | Percent-described | Sanity-check this against domain knowledge — an implausibly low or high percentage may indicate a prior that's too far from the data (revisit $\alpha$/$\beta$). |
 | Extrapolation | The credible band should widen (not narrow) further into the future — a band that stays razor-thin suggests overconfidence, usually from an overly tight $S_T$ prior. |
 | Effort vs. discovery scatter | A rough positive relationship supports the model's core assumption that more taxonomists means more species found. A flat or negative relationship is a warning sign worth investigating before trusting $S_T$. |
-| LOO-ELPD / CRPS / MAE (battery) | Prefer models that rank well on **both** ELPD and CRPS; large disagreement between the two metrics for a given model is itself informative (see §2.5 and the source manuscript's discussion of this exact situation). |
+| LOO-ELPD / CRPS / MAE (structure comparison) | Prefer structures that rank well on **both** ELPD and CRPS; large disagreement between the two metrics for a given structure is itself informative (see §2.5 and the source manuscript's discussion of this exact situation). |
 
 # Data Handling & Privacy
 
@@ -322,6 +389,17 @@ Column names must match exactly, including case (`scientificName`, not
 `ScientificName` or `Scientific_Name`). Check §3 for the exact required set
 per mode.
 
+**Category dropdown doesn't appear.**
+It only appears when your file contains at least one recognized taxonomic
+rank column (§3.3: `phylum` through `subGenus`). If your file is already a
+minimal, pre-filtered species list, this is expected — no action needed.
+
+**"No usable rows" after selecting a Category.**
+Check the category value spelling/case matches your data exactly (the
+dropdown is populated from your file's own values, so this should be rare),
+and remember `taxonomicStatus`/`taxonRank` filters (if those columns exist)
+apply on top of your category choice.
+
 **"Fewer than 3 usable time intervals after aggregation."**
 Your data, after filtering and interval aggregation, doesn't span enough
 distinct time buckets to fit a trend. Widen your start/end year range, or
@@ -335,21 +413,28 @@ any wait.
 
 **High `Rhat` / low `n_eff` warnings.**
 Increase iterations and warmup (or enable "Full precision"), and/or
-double-check that your $S_T$ prior isn't so tight that it conflicts sharply
-with the data (this can create hard-to-sample posterior geometry).
+double-check that your priors aren't so tight that they conflict sharply
+with the data (this can create hard-to-sample posterior geometry). The
+*host + linear* structure is particularly prone to this — see the
+numerical-stability note in §2.3.
 
-**"Enter a valid $S_T$ Gamma prior" error on Run.**
-The app deliberately has no default $S_T$ prior (§2.2) — `alpha` and `beta`
-must both be entered and positive before a single run can start.
+**"Enter a valid $S_T$/log($L_0$)/$L_0$ prior" error on Run.**
+The app deliberately has no default $S_T$ prior (§2.2), and only validates
+the efficiency-intercept prior(s) your *currently selected* structures
+actually need — fill in whichever block(s) are showing.
 
-**Host structure unavailable in my mode.**
-The host covariate is only available in Parasitic mode with an `Ht` value
-supplied; Free-living mode always uses the no-host structure only.
+**Host structures unavailable in my mode.**
+Host structures require a supplied `Ht` value and are only available in
+Parasitic mode; Free-living mode always uses no-host structures only.
 
 # Glossary
 
 - **$S_T$** — total number of species estimated to exist in the group (the
   primary output of the model).
+- **Structure** — one of up to four model variants: host term on/off crossed
+  with exponential/linear efficiency-trend form (§2.3).
+- **Category filter** — optional restriction of a full taxonomic export to
+  one rank/value (e.g. family = "Dactylogyridae") before analysis (§3.3).
 - **Interval** — a fixed-width block of consecutive years (e.g., a 5-year
   bin) used to aggregate species counts for model fitting.
 - **Effort ($T_i$)** — number of unique describing taxonomists active in an

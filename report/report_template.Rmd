@@ -16,17 +16,17 @@ params:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 5)
-# plot_*() functions are already available in .GlobalEnv (sourced once at app
-# startup by global.R); no need to re-source here, and the report's own
-# working directory is report/, not the project root, so a relative
-# source("R/plotting.R") would fail anyway.
+# plot_*()/structure_label() functions are already available in .GlobalEnv
+# (sourced once at app startup by global.R); no need to re-source here, and
+# the report's own working directory is report/, not the project root, so a
+# relative source("R/plotting.R") would fail anyway.
 results <- params$results
 interval_table <- params$interval_table
 ```
 
 # `r params$taxon_name`
 
-**Mode:** `r ifelse(params$mode == "parasitic", "Parasitic (host-availability covariate available)", "Free-living (no host covariate)")`
+**Mode:** `r ifelse(params$mode == "parasitic", "Parasitic (host structures available)", "Free-living (no-host structures only)")`
 **Interval width:** `r params$interval_years` years
 **Report generated:** `r format(params$generated_at, "%Y-%m-%d %H:%M %Z")`
 
@@ -39,21 +39,26 @@ only durable record of the analysis.*
 New species described in interval $i$ ($S_i$) are modeled as
 $S_i \sim \text{Poisson}(\lambda_i)$, with
 
-$$\log \lambda_i = \big(\log L_0 + \beta \cdot Y_i\big) + \log(S_T - \text{cumS}_i) \; [+ \log(H_t - \text{cumH}_i)] \;+ \log T_i$$
+$$\log \lambda_i = \log L_i + \log(S_T - \text{cumS}_i) \; [+ \log(H_t - \text{cumH}_i)] \;+ \log T_i$$
 
-where $S_T$ is the total number of species expected to exist, $L_0$ and $\beta$
-describe baseline and time-trending taxonomic efficiency, $T_i$ is the number of
-active taxonomists (an effort proxy), $\text{cumS}_i$ is the cumulative species
-described before interval $i$, and the optional host term $(H_t - \text{cumH}_i)$
-is included only for the "host" structure. This is the same model family used in
+where $S_T$ is the total number of species expected to exist, $T_i$ is the
+number of active taxonomists (an effort proxy), $\text{cumS}_i$ is the
+cumulative species described before interval $i$, and the optional host term
+$(H_t - \text{cumH}_i)$ is included only for "host" structures. The
+efficiency term $L_i$ takes one of two forms depending on the structure's
+trend form: **exponential**, $L_i = L_0 \cdot e^{\beta Y_i}$ (fit as
+$\log L_i = \log L_0 + \beta Y_i$), or **linear**, $L_i = L_0 + \beta Y_i$
+(floored at a small positive value). This is the same model family used in
 Boeger et al. (submitted, *Zoologia*, ZOOL-2026-0012.R1) to estimate Brazilian
-Dactylogyridae and Actinopterygii richness, generalized here to any user-supplied
-taxon and adapted from Pimm et al. (2010) and Joppa et al. (2011). Models were fit
-in Stan via `rstan`, with priors on $S_T$ (Gamma), $\log L_0$ and $\beta$ (Normal)
-supplied by the user for this run. *Implementation note:* to keep $\log T_i$
-finite for any interval with zero active taxonomists, the fitted model
-evaluates $\log(1+T_i)$ rather than $\log T_i$, a standard numerical safeguard
-that is negligible whenever $T_i \geq$ a few.
+Dactylogyridae (host + exponential) and Actinopterygii (no-host + linear)
+richness, generalized here to any user-supplied taxon and adapted from Pimm
+et al. (2010) and Joppa et al. (2011). Models were fit in Stan via `rstan`,
+with priors on $S_T$ (Gamma) and $\beta$ (Normal), plus $\log L_0$ or $L_0$
+(Normal, whichever the fitted structure's trend form needs), supplied by the
+user for this run. *Implementation note:* to keep $\log T_i$ finite for any
+interval with zero active taxonomists, the fitted model evaluates
+$\log(1+T_i)$ rather than $\log T_i$, a standard numerical safeguard that is
+negligible whenever $T_i \geq$ a few.
 
 ## Data summary
 
@@ -74,21 +79,28 @@ knitr::kable(
 plot_effort_scatter(interval_table)
 ```
 
+```{r single-comparison, results='asis', eval=identical(results$job_type, "single") && !is.null(results$comparison_table)}
+cat("\n\n## Structure comparison\n\n")
+cat("\n\nYou fit", length(results$per_structure), "structures on the same data \u2014 ranked below by LOO-ELPD (higher/less negative is better). This is how the app lets the observed S_i-vs-effort-vs-time relationship indicate which formula (linear or exponential trend, with or without the host term) fits best, rather than requiring a guess.\n\n")
+cat("\n\nBest-supported: **", structure_label(results$best_model_label), "**\n\n")
+
+comp <- results$comparison_table
+print(knitr::kable(comp[, c("model_label", "structure", "ST_median", "ST_lower", "ST_upper",
+                             "elpd_loo", "elpd_diff", "mean_crps", "mean_mae")], digits = 3, row.names = FALSE))
+print(plot_loo_comparison(comp))
+print(plot_predictive_scores(comp))
+```
+
 ```{r single-results, results='asis', eval=identical(results$job_type, "single")}
-structure_labels <- c(host = "With host covariate", no_host = "Without host covariate")
 for (st in names(results$per_structure)) {
   r <- results$per_structure[[st]]
-  cat("\n\n## Model:", structure_labels[[st]], "\n\n")
+  cat("\n\n## Model:", structure_label(st), "\n\n")
 
   cat("\n\n### Parameter estimates\n\n")
   print(knitr::kable(r$summary, digits = 4, row.names = FALSE))
 
-  cat("\n\n### Posterior distributions\n\n")
+  cat("\n\n### Posterior distribution and trace plot (S_T)\n\n")
   print(plot_posterior_hist(r$fit, "ST"))
-  print(plot_posterior_hist(r$fit, "log_L0"))
-  print(plot_posterior_hist(r$fit, "beta"))
-
-  cat("\n\n### Trace plots (convergence diagnostics)\n\n")
   print(plot_trace(r$fit, "ST"))
 
   cat("\n\n### Simulated vs. observed discovery rate\n\n")
@@ -107,7 +119,7 @@ for (st in names(results$per_structure)) {
 
 ```{r battery-results, results='asis', eval=identical(results$job_type, "battery")}
 cat("\n\n## Sensitivity battery: all scenarios \u00d7 structures\n\n")
-cat("\n\nBest-supported model by LOO-ELPD: **", results$best_model_label, "**\n\n")
+cat("\n\nBest-supported model by LOO-ELPD: **", structure_label(sub("^[^_]+_", "", results$best_model_label)) , "** (scenario ", sub("_.*$", "", results$best_model_label), ")\n\n")
 
 comp <- results$comparison_table
 print(knitr::kable(comp[, c("model_label", "scenario", "structure", "ST_median", "ST_lower", "ST_upper",
