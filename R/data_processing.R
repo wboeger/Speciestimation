@@ -53,7 +53,7 @@ split_authors <- function(authorship) {
 # CTFB (Cat\u00e1logo Taxon\u00f4mico da Fauna do Brasil) Darwin-Core-style taxonomic
 # hierarchy columns available for the optional "Category" filter below.
 CATEGORY_RANK_COLUMNS <- c(
-  "phylum", "class", "subClass", "infraClass", "superOrder", "order", "subOrder",
+  "phylum", "superClass", "class", "subClass", "infraClass", "superOrder", "order", "subOrder",
   "infraOrder", "superFamily", "family", "subFamily", "tribe", "subTribe",
   "genus", "subGenus"
 )

@@ -173,8 +173,17 @@ server <- function(input, output, session) {
   # filtering whenever those columns are present in the uploaded file. ----
   output$category_ui <- renderUI({
     req(rv$raw_df)
-    available_ranks <- intersect(CATEGORY_RANK_COLUMNS, names(rv$raw_df))
-    if (length(available_ranks) == 0) return(NULL)
+    actual_cols <- names(rv$raw_df)
+    trimmed_cols <- stringr::str_trim(actual_cols)
+    match_idx <- match(tolower(CATEGORY_RANK_COLUMNS), tolower(trimmed_cols))
+    available_ranks <- actual_cols[stats::na.omit(match_idx)]
+    if (length(available_ranks) == 0) {
+      return(helpText(
+        "No taxonomic hierarchy column detected (looked for: ",
+        paste(CATEGORY_RANK_COLUMNS, collapse = ", "),
+        "). Your file's columns: ", paste(actual_cols, collapse = ", ")
+      ))
+    }
     selectInput("category_column", "Category (optional taxonomic filter)",
                 choices = c("(none)" = "(none)", stats::setNames(available_ranks, available_ranks)),
                 selected = "(none)")
