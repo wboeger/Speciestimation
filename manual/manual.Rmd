@@ -144,20 +144,20 @@ the only option in free-living mode.
 > ends up informing your analysis twice: once as the fixed ceiling in the
 > host term above, and again if you derive your $S_T$ prior mean from it
 > (e.g. "$S_T \approx k \times H_t$" for some assumed parasite/host ratio
-> $k$ \u2014 exactly how the source manuscript's P1\u2013P6 scenarios were built).
-> That's not invalid \u2014 external information may legitimately inform a prior
-> \u2014 but it does mean an error in your $H_t$ estimate propagates through
+> $k$ — exactly how the source manuscript's P1–P6 scenarios were built).
+> That's not invalid — external information may legitimately inform a prior
+> — but it does mean an error in your $H_t$ estimate propagates through
 > *both* channels at once rather than being caught by one independent line
 > of evidence checking the other. The manuscript's own result illustrates
 > the effect starkly: $S_T$ ranged from 7,491 (documented $H_t=3{,}732$) to
-> 50,975 (estimated $H_t=7{,}991$ with a higher ratio) \u2014 "highly dependent
-> on the assumed total richness of \u2026 hosts," in the authors' words. Two
+> 50,975 (estimated $H_t=7{,}991$ with a higher ratio) — "highly dependent
+> on the assumed total richness of … hosts," in the authors' words. Two
 > ways to check how much your own conclusion rests on getting $H_t$ right:
-> (1) compare host vs. no-host structures (\u00a72.5) \u2014 if a host structure
+> (1) compare host vs. no-host structures (§2.5) — if a host structure
 > doesn't clearly outperform its no-host counterpart on LOO-ELPD/CRPS, the
 > host term isn't earning its keep beyond whatever the prior already
-> encodes; (2) run the **sensitivity battery** (\u00a74.3) with a *different*
-> $H_t$ per scenario \u2014 the battery form lets each scenario override $H_t$,
+> encodes; (2) run the **sensitivity battery** (§4.3) with a *different*
+> $H_t$ per scenario — the battery form lets each scenario override $H_t$,
 > so one run can cross several $H_t$ assumptions against several $S_T$-prior
 > scenarios and show you the resulting spread directly, the same way Table 4
 > of the source manuscript does.
@@ -258,20 +258,20 @@ optional Category-filter columns described below.
 
 ## Optional: Category and Habitat filters (CTFB-style exports)
 
-If your file is a full taxonomic export (e.g. from the Cat\u00e1logo Taxon\u00f4mico da
+If your file is a full taxonomic export (e.g. from the Catálogo Taxonômico da
 Fauna do Brasil, CTFB) with additional Darwin-Core-style columns, you can
 upload it **unfiltered** and let the app do the filtering for you:
 
 | Column | Effect |
 |---|---|
 | Any of `phylum`, `class`, `subClass`, `infraClass`, `superOrder`, `order`, `subOrder`, `infraOrder`, `superFamily`, `family`, `subFamily`, `tribe`, `subTribe`, `genus`, `subGenus` | If present, Tab 1 shows a **Category** dropdown letting you pick one of these rank columns and a value found in your data (e.g. `family = "Dactylogyridae"`); the app restricts to rows matching that value before doing anything else. |
-| Any of `habitat`, `environment`, `SALINITY`, `lifeForm` | If present, Tab 1 shows a **Habitat** dropdown letting you pick one of these columns and a value (e.g. `habitat = "agua doce"` to restrict to freshwater taxa, mirroring the `SALINITY == 'freshwater'` restriction used for Actinopterygii in the source manuscript). Values are matched per semicolon-separated token, so a row recorded as `"agua doce;marinho"` (both freshwater and marine) still matches either `"agua doce"` or `"marinho"` \u2014 not just an exact whole-cell match. |
-| `taxonomicStatus` / `taxonRank` | If either is present, Tab 1 shows a checkbox **"Restrict to accepted, species-rank names"**, checked by default: `taxonomicStatus == "NOME_ACEITO"` (accepted names only) and/or `taxonRank == "ESPECIE"` (species-rank only, excluding genus-level/"sp."/"aff." records). Uncheck it to keep every row regardless of status/rank \u2014 needed if you are reproducing a prior analysis (e.g. a published table) that did not apply this restriction, since it can materially change $S_i$ per interval. |
+| Any of `habitat`, `environment`, `SALINITY`, `lifeForm` | If present, Tab 1 shows a **Habitat** dropdown letting you pick one of these columns and a value (e.g. `habitat = "agua doce"` to restrict to freshwater taxa, mirroring the `SALINITY == 'freshwater'` restriction used for Actinopterygii in the source manuscript). Values are matched per semicolon-separated token, so a row recorded as `"agua doce;marinho"` (both freshwater and marine) still matches either `"agua doce"` or `"marinho"` — not just an exact whole-cell match. |
+| `taxonomicStatus` / `taxonRank` | If either is present, Tab 1 shows a checkbox **"Restrict to accepted, species-rank names"**, checked by default: `taxonomicStatus == "NOME_ACEITO"` (accepted names only) and/or `taxonRank == "ESPECIE"` (species-rank only, excluding genus-level/"sp."/"aff." records). Uncheck it to keep every row regardless of status/rank — needed if you are reproducing a prior analysis (e.g. a published table) that did not apply this restriction, since it can materially change $S_i$ per interval. |
 
 The Category and Habitat filters combine (AND) with each other and with the
-status/rank checkbox \u2014 e.g. family = "Dactylogyridae" AND habitat =
+status/rank checkbox — e.g. family = "Dactylogyridae" AND habitat =
 "agua doce" AND accepted/species-rank restricts to freshwater Dactylogyridae
-only. None of these filters is required \u2014 if your spreadsheet is already a
+only. None of these filters is required — if your spreadsheet is already a
 clean, pre-filtered list of species records (the minimal schema above), none
 of these columns need to exist and nothing changes. A status box on Tab 1
 reports exactly which filters were applied and how many rows they removed.
@@ -291,7 +291,7 @@ reports exactly which filters were applied and how many rows they removed.
   tail that can destabilize the fit.
 - The app automatically **drops the trailing interval** if it is narrower
   than your chosen interval width, or if it reaches the current calendar
-  year \u2014 records published in a year still in progress are necessarily
+  year — records published in a year still in progress are necessarily
   undercounted (the year has not finished), and an artificially low $S_i$ in
   the most recent interval would otherwise bias the fitted trend. This
   matches the convention used in the source manuscript's own scripts.
@@ -312,10 +312,10 @@ accounts; anyone with the password has full access.
 3. **Upload** your `.xlsx`/`.csv` file. A validation banner confirms the row
    count or reports the first missing/invalid column.
 4. If your file has recognizable taxonomic-hierarchy or habitat columns, an
-   optional **Category** and/or **Habitat** dropdown appears \u2014 e.g. pick
+   optional **Category** and/or **Habitat** dropdown appears — e.g. pick
    rank `family` = `Dactylogyridae`, and/or habitat = `agua doce` (freshwater);
    a status box reports the effect, along with any automatic
-   `taxonomicStatus`/`taxonRank` filtering (\u00a73.3).
+   `taxonomicStatus`/`taxonRank` filtering (§3.3).
 5. Set the **interval width** (in years) that species counts are aggregated
    into (e.g., 3 or 5 years — matching the interval width used in the
    Dactylogyridae/Actinopterygii analyses). Smaller intervals give more data
@@ -372,7 +372,7 @@ accounts; anyone with the password has full access.
    you want compared. In parasitic mode, each scenario also has an optional
    **Ht override**: leave it blank to use the Tab 1 $H_t$ for that scenario,
    or set a different value to test how sensitive your $S_T$ estimate is to
-   the host-pool assumption (§2.3's practical note) \u2014 e.g. one scenario at
+   the host-pool assumption (§2.3's practical note) — e.g. one scenario at
    the documented $H_t$ and another at a higher estimated $H_t$, each with
    its own matching $S_T$ prior, replicating the source manuscript's
    Conservative-vs-Extrapolated comparison in a single run. "Clear all
@@ -402,7 +402,7 @@ Whichever structures you fit, each shows:
   comfortably within the cloud of blue lines if the model fits well.
 - **Species vs. effort, simulated vs. observed**: the same posterior-
   predictive draws (Si_rep) plotted against each interval's *observed*
-  effort ($T_i$) instead of time \u2014 blue cloud = simulated species counts
+  effort ($T_i$) instead of time — blue cloud = simulated species counts
   at each interval's effort level, red points/line = your actual observed
   (T_i, S_i) pairs. This is the effort-axis counterpart of the
   simulated-vs-observed plot above.
@@ -416,7 +416,7 @@ Whichever structures you fit, each shows:
 If **two or more structures** were fit — the default for a single run, and
 always for a battery — a **Structure comparison** section appears first,
 with a ranked table (LOO-ELPD, CRPS, MAE, $H_t$, $S_T$ estimate per
-structure/scenario \u2014 $H_t$ is blank for no-host structures, and shows
+structure/scenario — $H_t$ is blank for no-host structures, and shows
 exactly which host-pool assumption produced each row's $S_T$) and comparison
 plots, with the best-supported structure called out explicitly (§2.5).
 
@@ -443,7 +443,7 @@ web fonts). About is a short in-app summary of scope and data handling.
 | Percent-described | Sanity-check this against domain knowledge — an implausibly low or high percentage may indicate a prior that's too far from the data (revisit $\alpha$/$\beta$). |
 | Extrapolation | The credible band should widen (not narrow) further into the future — a band that stays razor-thin suggests overconfidence, usually from an overly tight $S_T$ prior. |
 | Effort vs. discovery scatter (Tab 1, data-only) | A rough positive relationship supports the model's core assumption that more taxonomists means more species found. A flat or negative relationship is a warning sign worth investigating before trusting $S_T$. |
-| Effort trend (Tab 1, data-only) | Whether raw taxonomist effort ($T_i$) is itself rising, falling, or flat over time \u2014 check this before over-interpreting the fitted efficiency trend ($\beta$), since a trend in effort and a trend in per-taxonomist efficiency can otherwise be conflated. |
+| Effort trend (Tab 1, data-only) | Whether raw taxonomist effort ($T_i$) is itself rising, falling, or flat over time — check this before over-interpreting the fitted efficiency trend ($\beta$), since a trend in effort and a trend in per-taxonomist efficiency can otherwise be conflated. |
 | Species vs. effort, simulated vs. observed (Tab 3, per fitted structure) | Same idea as "Simulated vs. observed" above but on the effort axis: the red observed points/trend should sit inside the blue simulated cloud. A model that fits the time series (first plot) but not this one suggests the effort covariate itself is poorly captured by the fitted structure. |
 | LOO-ELPD / CRPS / MAE (structure comparison) | Prefer structures that rank well on **both** ELPD and CRPS; large disagreement between the two metrics for a given structure is itself informative (see §2.5 and the source manuscript's discussion of this exact situation). |
 
@@ -518,10 +518,10 @@ Parasitic mode; Free-living mode always uses no-host structures only.
 - **$H_t$** — total known/expected host-species pool (host structures only);
   a fixed number you supply, not fitted. Overridable per battery scenario
   (§4.3) to sensitivity-test how much $S_T$ depends on this assumption.
-- **Category filter** \u2014 optional restriction of a full taxonomic export to
-  one rank/value (e.g. family = "Dactylogyridae") before analysis (\u00a73.3).
-- **Habitat filter** \u2014 optional restriction to one habitat/environment
-  value (e.g. `habitat` = "agua doce", freshwater) before analysis (\u00a73.3).
+- **Category filter** — optional restriction of a full taxonomic export to
+  one rank/value (e.g. family = "Dactylogyridae") before analysis (§3.3).
+- **Habitat filter** — optional restriction to one habitat/environment
+  value (e.g. `habitat` = "agua doce", freshwater) before analysis (§3.3).
 - **Interval** — a fixed-width block of consecutive years (e.g., a 5-year
   bin) used to aggregate species counts for model fitting.
 - **Effort ($T_i$)** — number of unique describing taxonomists active in an
