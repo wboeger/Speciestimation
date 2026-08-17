@@ -7,6 +7,7 @@ FROM rocker/r-ver:4.4.2
 # libfontconfig/libfreetype/libpng/libtiff/libjpeg/libharfbuzz/libfribidi: ragg/textshaping (ggplot2 graphics device)
 # cmake: required by RcppParallel (a genuine Imports/LinkingTo dependency of rstan)
 # libuv1-dev: required by `fs` (a genuine Imports dependency of shiny/bslib/rmarkdown/DT)
+# wget/perl/xzdec: required by tinytex::install_tinytex() (PDF manual rendering)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -23,6 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfribidi-dev \
     zlib1g-dev \
     libuv1-dev \
+    wget \
+    perl \
+    xzdec \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -30,6 +34,10 @@ WORKDIR /app
 # --- R package installation (cached as its own layer) -------------------
 COPY build/install_packages.R build/install_packages.R
 RUN Rscript build/install_packages.R
+
+# --- TinyTeX (minimal LaTeX distribution) for PDF manual rendering -------
+RUN Rscript -e "tinytex::install_tinytex()"
+
 
 # --- App source -----------------------------------------------------------
 COPY . .

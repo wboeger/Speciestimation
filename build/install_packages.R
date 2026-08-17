@@ -18,7 +18,7 @@
 required <- c(
   "shiny", "bslib", "rstan", "bayesplot", "ggplot2", "dplyr", "tidyr",
   "stringr", "purrr", "readxl", "rmarkdown", "DT", "digest", "future",
-  "promises", "loo", "scoringRules", "knitr"
+  "promises", "loo", "scoringRules", "knitr", "tinytex"
 )
 
 repo <- "https://cloud.r-project.org"

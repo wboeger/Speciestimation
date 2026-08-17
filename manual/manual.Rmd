@@ -3,12 +3,12 @@ title: "Species Richness Estimator — User Manual"
 subtitle: "Bayesian species-discovery modeling for parasitic and free-living taxa"
 date: "`r format(Sys.Date(), '%Y-%m-%d')`"
 output:
-  html_document:
+  pdf_document:
     toc: true
-    toc_float: true
     toc_depth: 3
-    theme: flatly
     number_sections: true
+    latex_engine: pdflatex
+geometry: margin=1in
 ---
 
 ```{r setup, include=FALSE}

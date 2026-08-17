@@ -463,11 +463,11 @@ server <- function(input, output, session) {
   manual_ui <- function() {
     tagList(
       p("The complete user manual covers the scientific method behind the model, exact data requirements, and step-by-step usage instructions for every tab."),
-      tags$a(href = "manual.html", target = "_blank", download = NA,
-             class = "btn btn-primary btn-lg", "Download Manual (HTML)"),
+      tags$a(href = "manual.pdf", target = "_blank", download = NA,
+             class = "btn btn-primary btn-lg", "Download Manual (PDF)"),
       hr(),
       h5("Preview"),
-      tags$iframe(src = "manual.html", style = "width:100%; height:800px; border:1px solid #ddd;")
+      tags$iframe(src = "manual.pdf", style = "width:100%; height:800px; border:1px solid #ddd;")
     )
   }
 
