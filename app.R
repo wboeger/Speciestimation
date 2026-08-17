@@ -111,6 +111,8 @@ server <- function(input, output, session) {
         fileInput("upload", "Species inventory (.xlsx or .csv)", accept = c(".xlsx", ".csv")),
         uiOutput("category_ui"),
         uiOutput("category_value_ui"),
+        uiOutput("habitat_ui"),
+        uiOutput("habitat_value_ui"),
         uiOutput("status_rank_filter_ui"),
         helpText("Required columns: scientificName, namePublishedInYear, scientificNameAuthorship",
                  "; parasitic mode additionally requires animalHostNames (semicolon-separated host list)."),
@@ -194,6 +196,28 @@ server <- function(input, output, session) {
                 selected = "(none)")
   })
 
+  output$habitat_ui <- renderUI({
+    req(rv$raw_df)
+    actual_cols <- names(rv$raw_df)
+    trimmed_cols <- stringr::str_trim(actual_cols)
+    match_idx <- match(tolower(HABITAT_COLUMNS), tolower(trimmed_cols))
+    available_habitat_cols <- actual_cols[stats::na.omit(match_idx)]
+    if (length(available_habitat_cols) == 0) return(NULL)
+    selectInput("habitat_column", "Habitat (optional filter)",
+                choices = c("(none)" = "(none)", stats::setNames(available_habitat_cols, available_habitat_cols)),
+                selected = "(none)")
+  })
+
+  output$habitat_value_ui <- renderUI({
+    req(rv$raw_df, input$habitat_column, !identical(input$habitat_column, "(none)"))
+    col <- input$habitat_column
+    req(col %in% names(rv$raw_df))
+    raw_vals <- stats::na.omit(as.character(rv$raw_df[[col]]))
+    tokens <- unlist(lapply(raw_vals, function(x) stringr::str_trim(stringr::str_split(x, ";")[[1]])))
+    values <- sort(unique(tokens[tokens != ""]))
+    selectInput("habitat_value", paste(col, "value"), choices = values)
+  })
+
   output$status_rank_filter_ui <- renderUI({
     req(rv$raw_df)
     if (!any(c("taxonomicStatus", "taxonRank") %in% names(rv$raw_df))) return(NULL)
@@ -215,9 +239,12 @@ server <- function(input, output, session) {
     req(rv$raw_df)
     cat_col <- if (is.null(input$category_column)) NULL else input$category_column
     cat_val <- if (is.null(input$category_value)) NULL else input$category_value
+    hab_col <- if (is.null(input$habitat_column)) NULL else input$habitat_column
+    hab_val <- if (is.null(input$habitat_value)) NULL else input$habitat_value
     apply_status <- if (is.null(input$auto_status_filter)) TRUE else isTRUE(input$auto_status_filter)
     apply_category_status_filter(rv$raw_df, category_column = cat_col, category_value = cat_val,
-                                  apply_status_rank_filter = apply_status)
+                                  apply_status_rank_filter = apply_status,
+                                  habitat_column = hab_col, habitat_value = hab_val)
   })
 
   output$preview_table <- renderDT({

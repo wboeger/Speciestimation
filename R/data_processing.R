@@ -58,21 +58,35 @@ CATEGORY_RANK_COLUMNS <- c(
   "genus", "subGenus"
 )
 
+# Columns that describe a record's ecological habitat/environment/salinity
+# regime, available for the optional "Habitat" filter below. Covers both
+# CTFB-style Darwin-Core exports (habitat, environment, lifeForm) and the
+# SALINITY column used in the source Actinopterygii dataset (Boeger et al.,
+# submitted) to restrict to freshwater taxa.
+HABITAT_COLUMNS <- c("habitat", "environment", "SALINITY", "lifeForm")
+
 #' Optional pre-filter for full CTFB-style exports: restrict to one taxonomic
-#' category/value (e.g. family = "Dactylogyridae") and, optionally (when the
+#' category/value (e.g. family = "Dactylogyridae"), one habitat/value (e.g.
+#' habitat = "agua doce", i.e. freshwater), and, optionally (when the
 #' relevant columns are present AND `apply_status_rank_filter` is TRUE), to
 #' accepted names at species rank (taxonomicStatus == "NOME_ACEITO",
 #' taxonRank == "ESPECIE"). Any filter whose column is absent from `df` is
 #' silently skipped, so this works unchanged for minimal, non-CTFB
 #' spreadsheets too.
 #'
+#' @param habitat_column,habitat_value habitat/environment restriction. The
+#'   column value is split on ";" before matching (some CTFB exports record
+#'   multiple habitats per row, e.g. "agua doce;marinho"), so a row matches
+#'   if `habitat_value` is ANY of its semicolon-separated tokens \u2014 not just
+#'   an exact whole-cell match.
 #' @param apply_status_rank_filter if FALSE, skip the taxonomicStatus/
 #'   taxonRank restriction even when those columns are present \u2014 needed to
 #'   reproduce analyses (e.g. a prior manuscript run) that used every row
 #'   matching the year/name/host criteria regardless of status or rank.
 #' @return list(df = filtered data.frame, n_before, n_after, applied = character vector of filters used)
 apply_category_status_filter <- function(df, category_column = NULL, category_value = NULL,
-                                          apply_status_rank_filter = TRUE) {
+                                          apply_status_rank_filter = TRUE,
+                                          habitat_column = NULL, habitat_value = NULL) {
   applied <- character(0)
   n_before <- nrow(df)
 
@@ -83,6 +97,19 @@ apply_category_status_filter <- function(df, category_column = NULL, category_va
                stringr::str_trim(as.character(df[[category_column]])) == stringr::str_trim(category_value), , drop = FALSE]
     applied <- c(applied, sprintf('%s = "%s"', category_column, category_value))
   }
+
+  if (!is.null(habitat_column) && !identical(habitat_column, "") && !identical(habitat_column, "(none)") &&
+      !is.null(habitat_value) && !identical(habitat_value, "") &&
+      habitat_column %in% names(df)) {
+    habitat_tokens <- lapply(as.character(df[[habitat_column]]), function(x) {
+      if (is.na(x)) return(character(0))
+      stringr::str_trim(stringr::str_split(x, ";")[[1]])
+    })
+    row_matches <- vapply(habitat_tokens, function(toks) habitat_value %in% toks, logical(1))
+    df <- df[row_matches, , drop = FALSE]
+    applied <- c(applied, sprintf('%s ~ "%s"', habitat_column, habitat_value))
+  }
+
   if (isTRUE(apply_status_rank_filter)) {
     if ("taxonomicStatus" %in% names(df)) {
       df <- df[!is.na(df$taxonomicStatus) & df$taxonomicStatus == "NOME_ACEITO", , drop = FALSE]
