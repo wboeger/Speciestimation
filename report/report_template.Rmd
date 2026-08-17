@@ -98,6 +98,7 @@ print(knitr::kable(comp[, c("model_label", "structure", "Ht", "ST_median", "ST_l
                              "elpd_loo", "elpd_diff", "mean_crps", "mean_mae")], digits = 3, row.names = FALSE))
 print(plot_loo_comparison(comp))
 print(plot_predictive_scores(comp))
+print(plot_rank_comparison(comp))
 ```
 
 ```{r single-results, results='asis', eval=identical(results$job_type, "single")}
@@ -139,6 +140,7 @@ print(knitr::kable(comp[, c("model_label", "scenario", "structure", "Ht", "ST_me
 
 print(plot_loo_comparison(comp))
 print(plot_predictive_scores(comp))
+print(plot_rank_comparison(comp))
 
 cat("\n\n### Detail for the best-supported model\n\n")
 best_fit <- results$fits[[results$best_model_label]]

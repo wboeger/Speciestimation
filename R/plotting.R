@@ -171,4 +171,37 @@ plot_predictive_scores <- function(scores_df) {
     theme_app()
 }
 
+#' Rank-concordance plot (replicates the source manuscript's Figure 10):
+#' each fitted model's LOO-ELPD rank plotted against its CRPS rank, ordered
+#' along the x-axis by CRPS rank (1 = best). Requires 2+ fitted models
+#' (single-run comparison or battery). Visualizes how well the two proper
+#' scoring rules agree on which models perform best \u2014 large gaps between
+#' the two lines for a given model flag disagreement between the metrics,
+#' which the manuscript itself found for several mid/low-ranked models even
+#' though the top-ranked models showed strong consensus across both.
+plot_rank_comparison <- function(comparison_df) {
+  df <- comparison_df
+  df$model_label <- as.character(df$model_label)
+  df$CRPS_Rank <- rank(df$mean_crps, ties.method = "first")
+  df$ELPD_Rank <- rank(-df$elpd_loo, ties.method = "first")
+  ordered_labels <- df$model_label[order(df$CRPS_Rank)]
+  df$model_label <- factor(df$model_label, levels = ordered_labels)
+
+  long_df <- tidyr::pivot_longer(df, cols = c("CRPS_Rank", "ELPD_Rank"),
+                                  names_to = "metric", values_to = "rank_value")
+  long_df$metric <- factor(long_df$metric, levels = c("CRPS_Rank", "ELPD_Rank"))
+
+  ggplot2::ggplot(long_df, ggplot2::aes(x = .data$model_label, y = .data$rank_value,
+                                          color = .data$metric, group = .data$metric)) +
+    ggplot2::geom_line(linewidth = 0.8) +
+    ggplot2::geom_point(size = 3) +
+    ggplot2::scale_y_reverse(breaks = seq_len(nrow(df))) +
+    ggplot2::scale_color_manual(values = c(CRPS_Rank = "#F8766D", ELPD_Rank = "#00BFC4")) +
+    ggplot2::labs(title = "Model performance ranking: LOO-ELPD vs. CRPS concordance",
+                  subtitle = "Ordered by CRPS rank (1 = best) \u2014 gaps between the two lines flag metric disagreement",
+                  x = "Model", y = "Performance rank (1 = best)", color = "Evaluation metric") +
+    theme_app() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+}
+
 `%||%` <- function(a, b) if (is.null(a)) b else a

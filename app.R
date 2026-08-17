@@ -549,6 +549,7 @@ server <- function(input, output, session) {
             column(6, plotOutput("single_cmp_loo_plot")),
             column(6, plotOutput("single_cmp_scores_plot"))
           ),
+          plotOutput("single_cmp_rank_plot"),
           hr()
         )
       } else {
@@ -582,6 +583,7 @@ server <- function(input, output, session) {
         DTOutput("battery_table"),
         plotOutput("battery_loo_plot"),
         plotOutput("battery_scores_plot"),
+        plotOutput("battery_rank_plot"),
         h4("Best-supported model detail"),
         plotOutput("battery_effort_sim_plot")
       )
@@ -610,11 +612,13 @@ server <- function(input, output, session) {
         output$single_cmp_table <- renderDT(datatable(res$comparison_table, options = list(scrollX = TRUE)))
         output$single_cmp_loo_plot <- renderPlot(plot_loo_comparison(res$comparison_table))
         output$single_cmp_scores_plot <- renderPlot(plot_predictive_scores(res$comparison_table))
+        output$single_cmp_rank_plot <- renderPlot(plot_rank_comparison(res$comparison_table))
       }
     } else {
       output$battery_table <- renderDT(datatable(res$comparison_table, options = list(scrollX = TRUE)))
       output$battery_loo_plot <- renderPlot(plot_loo_comparison(res$comparison_table))
       output$battery_scores_plot <- renderPlot(plot_predictive_scores(res$comparison_table))
+      output$battery_rank_plot <- renderPlot(plot_rank_comparison(res$comparison_table))
       best_fit <- res$fits[[res$best_model_label]]
       output$battery_effort_sim_plot <- renderPlot(plot_effort_scatter_sim(best_fit, res$interval_table))
     }

@@ -226,6 +226,16 @@ each structure's individual diagnostics, using:
   Error) of the posterior-predictive distribution against your observed
   $S_i$ time series (via `scoringRules`). Lower is better for both.
 
+Alongside the ELPD-difference and CRPS/MAE bar charts, a **rank-concordance
+plot** shows every fitted model's LOO-ELPD rank plotted against its CRPS
+rank side by side (1 = best), ordered along the x-axis by CRPS rank — this
+directly reproduces Figure 10 of the source manuscript. Large gaps between
+the two lines for a given model flag genuine disagreement between the
+metrics (the manuscript found this mostly among mid/low-ranked models);
+close agreement at the top of the ranking, as in the source study, is a
+strong signal that the best-supported model isn't an artifact of picking
+one scoring rule over the other.
+
 This is the app's answer to "should I use a linear or exponential trend, and
 should I include the host term?" — fit the candidates you want to compare
 (any subset of the four structures) in a single run, and read off the
@@ -417,8 +427,10 @@ If **two or more structures** were fit — the default for a single run, and
 always for a battery — a **Structure comparison** section appears first,
 with a ranked table (LOO-ELPD, CRPS, MAE, $H_t$, $S_T$ estimate per
 structure/scenario — $H_t$ is blank for no-host structures, and shows
-exactly which host-pool assumption produced each row's $S_T$) and comparison
-plots, with the best-supported structure called out explicitly (§2.5).
+exactly which host-pool assumption produced each row's $S_T$), the
+ELPD-difference and CRPS/MAE comparison plots, and the LOO-ELPD-vs-CRPS
+rank-concordance plot (§2.5), with the best-supported structure called out
+explicitly.
 
 ## Tab 4 — Download Report
 
@@ -446,6 +458,7 @@ web fonts). About is a short in-app summary of scope and data handling.
 | Effort trend (Tab 1, data-only) | Whether raw taxonomist effort ($T_i$) is itself rising, falling, or flat over time — check this before over-interpreting the fitted efficiency trend ($\beta$), since a trend in effort and a trend in per-taxonomist efficiency can otherwise be conflated. |
 | Species vs. effort, simulated vs. observed (Tab 3, per fitted structure) | Same idea as "Simulated vs. observed" above but on the effort axis: the red observed points/trend should sit inside the blue simulated cloud. A model that fits the time series (first plot) but not this one suggests the effort covariate itself is poorly captured by the fitted structure. |
 | LOO-ELPD / CRPS / MAE (structure comparison) | Prefer structures that rank well on **both** ELPD and CRPS; large disagreement between the two metrics for a given structure is itself informative (see §2.5 and the source manuscript's discussion of this exact situation). |
+| Rank-concordance plot (structure comparison, 2+ models) | Close agreement (small vertical gaps) between the CRPS-rank and ELPD-rank lines, especially near rank 1, means the two scoring rules agree on the best model. Wide gaps for a specific model mean the two metrics disagree on it — don't lean on that model's ranking from a single metric alone. |
 
 # Data Handling & Privacy
 
