@@ -37,7 +37,12 @@ only durable record of the analysis.*
 ## Method
 
 New species described in interval $i$ ($S_i$) are modeled as
-$S_i \sim \text{Poisson}(\lambda_i)$, with
+$S_i \sim \text{Poisson}(\lambda_i)$, where
+$\lambda_i = T_i \cdot (S_T-\text{cumS}_i)\;[\cdot(H_t-\text{cumH}_i)]\cdot L_i$
+(product of effort, species remaining, optional hosts remaining, and
+efficiency). Taking $\log$ of both sides — $\log(xyz)=\log x+\log y+\log z$,
+the only step applied — turns this product into the sum actually evaluated
+by Stan's numerically stable Poisson likelihood:
 
 $$\log \lambda_i = \log L_i + \log(S_T - \text{cumS}_i) \; [+ \log(H_t - \text{cumH}_i)] \;+ \log T_i$$
 

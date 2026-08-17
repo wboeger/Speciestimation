@@ -47,27 +47,53 @@ your browser session. See §6 ("Data Handling & Privacy") for details.
 ## The discovery process
 
 The number of *new* species described in time interval $i$, $S_i$, is modeled
-as a random draw from a Poisson process whose rate depends on (a) how many
-species remain to be discovered, (b) how much taxonomic effort was applied,
-(c) for parasitic taxa, how many host species remain available to be
-surveyed, and (d) a trend in baseline taxonomic efficiency over time:
+as a random draw from a Poisson process:
+
+$$S_i \sim \text{Poisson}(\lambda_i)$$
+
+where the rate $\lambda_i$ depends on (a) how many species remain to be
+discovered, (b) how much taxonomic effort was applied, (c) for parasitic
+taxa, how many host species remain available to be surveyed, and (d) a trend
+in baseline taxonomic efficiency over time. Following Pimm et al. (2010),
+Joppa et al. (2011), and Boeger et al. (submitted), this is stated as a
+**product** of those four factors — e.g. for the host + exponential-trend
+structure:
 
 $$
-\log \lambda_i \;=\; \underbrace{\log L_i}_{\text{efficiency at time } Y_i}
+\lambda_i \;=\; \underbrace{T_i}_{\text{effort}}
+\;\cdot\; \underbrace{(S_T - \text{cumS}_i)}_{\text{species remaining}}
+\;\cdot\; \underbrace{(H_t - \text{cumH}_i)}_{\text{hosts remaining}}
+\;\cdot\; \underbrace{L_0\, e^{\beta Y_i}}_{\text{efficiency at time } Y_i}
+$$
+
+equivalent to the published form
+$S_i/[T_i(S_T-\text{cumS}_i)(H_t-\text{cumH}_i)] = \exp(\log L_0 + \beta Y_i)$
+with $L_0 \equiv a$. **The app fits this exact rate**, but internally in
+*log* form, because Stan's numerically stable Poisson likelihood
+(`poisson_log`) takes $\log \lambda_i$ directly rather than $\lambda_i$
+itself (avoiding overflow/underflow, since $\lambda_i$ spans many orders of
+magnitude across intervals). Taking $\log$ of the product above is a single,
+exact algebraic step — $\log(xyz) = \log x + \log y + \log z$ turns the
+product into a sum, nothing more:
+
+$$
+\log \lambda_i \;=\; \underbrace{\log T_i}_{\text{effort}}
 \;+\; \underbrace{\log(S_T - \text{cumS}_i)}_{\text{species remaining}}
 \;+\; \underbrace{\log(H_t - \text{cumH}_i)}_{\text{hosts remaining (host structures only)}}
-\;+\; \underbrace{\log T_i}_{\text{effort}}
-\qquad
-S_i \sim \text{Poisson}(\lambda_i)
+\;+\; \underbrace{\log L_i}_{\text{efficiency at time } Y_i}
 $$
 
-$L_i$, the efficiency term, takes one of two forms depending on your chosen
-**trend form** — see §2.3 for both exact equations. *Implementation note:* to
-keep $\log T_i$ finite for any interval with zero active taxonomists, the
-fitted model evaluates $\log(1+T_i)$ rather than $\log T_i$ — a standard
-Laplace-style safeguard that is numerically indistinguishable from $\log T_i$
-whenever $T_i \geq$ a few, and only changes behavior for empty (zero-effort)
-intervals, where it keeps their contribution finite instead of $-\infty$.
+This is the form actually evaluated by the fitted Stan code; it is
+numerically a different *representation* of the same $\lambda_i$, not a
+different model. $L_i$, the efficiency term, takes one of two forms
+depending on your chosen **trend form** — see §2.3 for both exact equations
+(both in product form and in the equivalent log form the app fits).
+*Implementation note:* to keep $\log T_i$ finite for any interval with zero
+active taxonomists, the fitted model evaluates $\log(1+T_i)$ rather than
+$\log T_i$ — a standard Laplace-style safeguard that is numerically
+indistinguishable from $\log T_i$ whenever $T_i \geq$ a few, and only changes
+behavior for empty (zero-effort) intervals, where it keeps their
+contribution finite instead of $-\infty$.
 
 | Symbol | Meaning |
 |---|---|
@@ -116,17 +142,21 @@ the only option in free-living mode.
 
 **Efficiency-trend form** (exponential/linear): the two published parent
 models use two different assumptions about how baseline efficiency $L_i$
-evolves over time:
+evolves over time. Both are shown below in their original product form
+(as in your source formula) and the equivalent log form the app actually
+fits (§2.1's product-to-sum identity applied to $L_i$ alone):
 
 - **Exponential trend** (used for Dactylogyridae in Boeger et al.):
-  $$L_i = L_0 \cdot e^{\beta Y_i}, \qquad\text{i.e. fit on the log scale as } \log L_i = \log L_0 + \beta Y_i.$$
+  $$L_i = L_0 \cdot e^{\beta Y_i} \qquad\Longleftrightarrow\qquad \log L_i = \log L_0 + \beta Y_i.$$
   Efficiency changes by a constant *proportion* per unit time and can never
   turn negative, whatever $\beta$ is.
 - **Linear trend** (the original Pimm et al. 2010 / Joppa et al. 2011 form,
   used for Actinopterygii in Boeger et al.):
-  $$L_i = L_0 + \beta Y_i.$$
-  Efficiency changes by a constant *absolute amount* per unit time; the app
-  floors $L_i$ at a small positive value so the Poisson rate stays valid even
+  $$L_i = L_0 + \beta Y_i \qquad\Longleftrightarrow\qquad \log L_i = \log(L_0 + \beta Y_i).$$
+  Efficiency changes by a constant *absolute amount* per unit time; note the
+  log here is applied to the whole sum $(L_0+\beta Y_i)$, not distributed
+  across it — there is no further product to expand. The app floors $L_i$ at
+  a small positive value so the Poisson rate (and this log) stays valid even
   where the trend would otherwise cross zero within your observed range.
 
 Crossing these two axes gives **four selectable structures**: *host +
