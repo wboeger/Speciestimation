@@ -218,12 +218,18 @@ fit_and_package <- function(stan_data_base, structure, prior, Ht, compiled_model
 }
 
 #' One comparison-table row (LOO-ELPD, CRPS, MAE, ST estimate) for a fitted model.
-comparison_row <- function(model_label, scenario_label, structure, fit, observed_Si) {
+#' `Ht` is recorded for host structures so the comparison table (and report)
+#' shows exactly which host-pool assumption produced each ST estimate -- the
+#' host-availability covariate and the ST prior mean can both be derived from
+#' the same Ht assumption (see the manual's discussion of Ht sensitivity), so
+#' surfacing it per row makes that dependency visible rather than implicit.
+comparison_row <- function(model_label, scenario_label, structure, fit, observed_Si, Ht = NA_real_) {
   loo_obj <- tryCatch(compute_loo(fit), error = function(e) NULL)
   scores <- compute_predictive_scores(fit, observed_Si)
   st_draws <- rstan::extract(fit, "ST")$ST
   data.frame(
     model_label = model_label, scenario = scenario_label, structure = structure,
+    Ht = if (structure_is_host(structure)) Ht else NA_real_,
     ST_median = stats::median(st_draws),
     ST_lower = stats::quantile(st_draws, 0.025, names = FALSE),
     ST_upper = stats::quantile(st_draws, 0.975, names = FALSE),
@@ -262,7 +268,7 @@ run_single_job <- function(spec) {
     )
     results[[st]] <- r
     if (length(spec$structures) > 1) {
-      rows[[st]] <- comparison_row(st, "single", st, r$fit, spec$stan_data_base$Si)
+      rows[[st]] <- comparison_row(st, "single", st, r$fit, spec$stan_data_base$Si, Ht = spec$Ht)
     }
   }
 
@@ -280,6 +286,11 @@ run_single_job <- function(spec) {
 }
 
 #' Full sensitivity-battery job: every user-defined scenario x every requested structure.
+#' Each scenario MAY carry its own `Ht` (host-pool override); when absent
+#' (NULL/NA), the run-level `spec$Ht` (Tab 1 default) is used instead. This
+#' lets a single battery cross host-pool assumptions with ST-prior scenarios
+#' in one run -- exactly the Conservative-vs-Extrapolated Ht sensitivity the
+#' source manuscript ran as two separate batches (see manual \u00a72.2).
 run_battery_job <- function(spec) {
   fits <- list()
   rows <- list()
@@ -289,12 +300,14 @@ run_battery_job <- function(spec) {
                   log_L0_mean = sc$log_L0_mean, log_L0_sd = sc$log_L0_sd,
                   L0_mean = sc$L0_mean, L0_sd = sc$L0_sd,
                   beta_mean = sc$beta_mean, beta_sd = sc$beta_sd)
+    ht_i <- sc$Ht
+    if (is.null(ht_i) || is.na(ht_i)) ht_i <- spec$Ht
     for (st in spec$structures) {
       label <- paste0(sc$name, "_", st)
-      fit <- fit_species_model(spec$stan_data_base, st, prior, spec$Ht, spec$compiled_models,
+      fit <- fit_species_model(spec$stan_data_base, st, prior, ht_i, spec$compiled_models,
                                 iter = spec$iter, warmup = spec$warmup, chains = spec$chains)
       fits[[label]] <- fit
-      rows[[label]] <- comparison_row(label, sc$name, st, fit, spec$stan_data_base$Si)
+      rows[[label]] <- comparison_row(label, sc$name, st, fit, spec$stan_data_base$Si, Ht = ht_i)
     }
   }
 

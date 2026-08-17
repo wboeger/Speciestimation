@@ -140,6 +140,28 @@ host-species pool) and the app computes $\text{cumH}_i$ automatically from the
 `animalHostNames` column. The *no-host* structures omit that term; they are
 the only option in free-living mode.
 
+> **$H_t$'s dual role, and why you should sensitivity-test it.** $H_t$ often
+> ends up informing your analysis twice: once as the fixed ceiling in the
+> host term above, and again if you derive your $S_T$ prior mean from it
+> (e.g. "$S_T \approx k \times H_t$" for some assumed parasite/host ratio
+> $k$ \u2014 exactly how the source manuscript's P1\u2013P6 scenarios were built).
+> That's not invalid \u2014 external information may legitimately inform a prior
+> \u2014 but it does mean an error in your $H_t$ estimate propagates through
+> *both* channels at once rather than being caught by one independent line
+> of evidence checking the other. The manuscript's own result illustrates
+> the effect starkly: $S_T$ ranged from 7,491 (documented $H_t=3{,}732$) to
+> 50,975 (estimated $H_t=7{,}991$ with a higher ratio) \u2014 "highly dependent
+> on the assumed total richness of \u2026 hosts," in the authors' words. Two
+> ways to check how much your own conclusion rests on getting $H_t$ right:
+> (1) compare host vs. no-host structures (\u00a72.5) \u2014 if a host structure
+> doesn't clearly outperform its no-host counterpart on LOO-ELPD/CRPS, the
+> host term isn't earning its keep beyond whatever the prior already
+> encodes; (2) run the **sensitivity battery** (\u00a74.3) with a *different*
+> $H_t$ per scenario \u2014 the battery form lets each scenario override $H_t$,
+> so one run can cross several $H_t$ assumptions against several $S_T$-prior
+> scenarios and show you the resulting spread directly, the same way Table 4
+> of the source manuscript does.
+
 **Efficiency-trend form** (exponential/linear): the two published parent
 models use two different assumptions about how baseline efficiency $L_i$
 evolves over time. Both are shown below in their original product form
@@ -347,7 +369,14 @@ accounts; anyone with the password has full access.
    $\beta$ priors, plus both the exponential-trend and linear-trend
    efficiency priors — whichever your selected structures need for that
    scenario gets used) and click "Add scenario"; repeat for each scenario
-   you want compared. "Clear all scenarios" resets the list.
+   you want compared. In parasitic mode, each scenario also has an optional
+   **Ht override**: leave it blank to use the Tab 1 $H_t$ for that scenario,
+   or set a different value to test how sensitive your $S_T$ estimate is to
+   the host-pool assumption (§2.3's practical note) \u2014 e.g. one scenario at
+   the documented $H_t$ and another at a higher estimated $H_t$, each with
+   its own matching $S_T$ prior, replicating the source manuscript's
+   Conservative-vs-Extrapolated comparison in a single run. "Clear all
+   scenarios" resets the list.
 5. **MCMC settings**: default iterations (4000) and warmup (2000) with 4
    chains are adequate for exploration; check "Full precision" (20000/10000)
    for a final, publication-quality run once you're satisfied with your setup
@@ -386,9 +415,10 @@ Whichever structures you fit, each shows:
 
 If **two or more structures** were fit — the default for a single run, and
 always for a battery — a **Structure comparison** section appears first,
-with a ranked table (LOO-ELPD, CRPS, MAE, $S_T$ estimate per structure/
-scenario) and comparison plots, with the best-supported structure called out
-explicitly (§2.5).
+with a ranked table (LOO-ELPD, CRPS, MAE, $H_t$, $S_T$ estimate per
+structure/scenario \u2014 $H_t$ is blank for no-host structures, and shows
+exactly which host-pool assumption produced each row's $S_T$) and comparison
+plots, with the best-supported structure called out explicitly (§2.5).
 
 ## Tab 4 — Download Report
 
@@ -485,6 +515,9 @@ Parasitic mode; Free-living mode always uses no-host structures only.
   primary output of the model).
 - **Structure** — one of up to four model variants: host term on/off crossed
   with exponential/linear efficiency-trend form (§2.3).
+- **$H_t$** — total known/expected host-species pool (host structures only);
+  a fixed number you supply, not fitted. Overridable per battery scenario
+  (§4.3) to sensitivity-test how much $S_T$ depends on this assumption.
 - **Category filter** \u2014 optional restriction of a full taxonomic export to
   one rank/value (e.g. family = "Dactylogyridae") before analysis (\u00a73.3).
 - **Habitat filter** \u2014 optional restriction to one habitat/environment

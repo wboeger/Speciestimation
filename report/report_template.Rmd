@@ -94,7 +94,7 @@ cat("\n\nYou fit", length(results$per_structure), "structures on the same data \
 cat("\n\nBest-supported: **", structure_label(results$best_model_label), "**\n\n")
 
 comp <- results$comparison_table
-print(knitr::kable(comp[, c("model_label", "structure", "ST_median", "ST_lower", "ST_upper",
+print(knitr::kable(comp[, c("model_label", "structure", "Ht", "ST_median", "ST_lower", "ST_upper",
                              "elpd_loo", "elpd_diff", "mean_crps", "mean_mae")], digits = 3, row.names = FALSE))
 print(plot_loo_comparison(comp))
 print(plot_predictive_scores(comp))
@@ -134,7 +134,7 @@ cat("\n\n## Sensitivity battery: all scenarios \u00d7 structures\n\n")
 cat("\n\nBest-supported model by LOO-ELPD: **", structure_label(sub("^[^_]+_", "", results$best_model_label)) , "** (scenario ", sub("_.*$", "", results$best_model_label), ")\n\n")
 
 comp <- results$comparison_table
-print(knitr::kable(comp[, c("model_label", "scenario", "structure", "ST_median", "ST_lower", "ST_upper",
+print(knitr::kable(comp[, c("model_label", "scenario", "structure", "Ht", "ST_median", "ST_lower", "ST_upper",
                              "elpd_loo", "elpd_diff", "mean_crps", "mean_mae")], digits = 3, row.names = FALSE))
 
 print(plot_loo_comparison(comp))

@@ -345,6 +345,11 @@ server <- function(input, output, session) {
           numericInput("sc_log_L0_sd", "log(L0) sd (exponential trend)", value = 2),
           numericInput("sc_L0_mean", "L0 mean (linear trend)", value = 0.001, step = 0.0001),
           numericInput("sc_L0_sd", "L0 sd (linear trend)", value = 0.01, min = 0.0001, step = 0.0001),
+          conditionalPanel(
+            condition = "input.mode == 'parasitic'",
+            numericInput("sc_Ht", "Ht override (host structures only \u2014 blank = use Tab 1 Ht)", value = NA, min = 1),
+            helpText("Set a different host-pool size per scenario to test how much your ST estimate depends on that assumption \u2014 e.g. pair a documented Ht with a conservative parasite/host ratio in one scenario, and an estimated/extrapolated Ht with a higher ratio in another (see manual \u00a72.2).")
+          ),
           actionButton("add_scenario", "Add scenario", class = "btn-secondary"),
           actionButton("clear_scenarios", "Clear all scenarios", class = "btn-outline-danger"),
           tableOutput("scenario_table")
@@ -391,7 +396,8 @@ server <- function(input, output, session) {
       name = input$sc_name, ST_alpha = input$sc_ST_alpha, ST_beta = input$sc_ST_beta,
       log_L0_mean = input$sc_log_L0_mean, log_L0_sd = input$sc_log_L0_sd,
       L0_mean = input$sc_L0_mean, L0_sd = input$sc_L0_sd,
-      beta_mean = input$sc_beta_mean, beta_sd = input$sc_beta_sd
+      beta_mean = input$sc_beta_mean, beta_sd = input$sc_beta_sd,
+      Ht = if (is.null(input$sc_Ht)) NA_real_ else input$sc_Ht
     )
   })
   observeEvent(input$clear_scenarios, { rv$battery_scenarios <- list() })
@@ -416,15 +422,12 @@ server <- function(input, output, session) {
     needs_exp <- any(structure_trend(structures) == "exp")
     needs_linear <- any(structure_trend(structures) == "linear")
 
-    Ht <- if (needs_host) input$Ht else NULL
-    if (needs_host && (is.na(Ht) || Ht <= 0)) {
-      rv$job_error <- "Enter a positive total host-species pool (Ht) before running \u2014 required by the host structure(s) you selected."
-      return()
-    }
     if (length(structures) == 0) {
       rv$job_error <- "Select at least one structure to fit."
       return()
     }
+
+    Ht <- if (needs_host) input$Ht else NULL
 
     iter <- if (isTRUE(input$full_precision)) 20000 else input$iter
     warmup <- if (isTRUE(input$full_precision)) 10000 else input$warmup
@@ -436,6 +439,21 @@ server <- function(input, output, session) {
         rv$job_error <- "Add at least one battery scenario before running."
         return()
       }
+      if (needs_host) {
+        resolve_ht <- function(sc) { eff <- sc$Ht; if (is.null(eff) || is.na(eff)) eff <- Ht; eff }
+        unresolved <- vapply(rv$battery_scenarios, function(sc) {
+          eff <- resolve_ht(sc)
+          is.null(eff) || is.na(eff) || eff <= 0
+        }, logical(1))
+        if (any(unresolved)) {
+          bad_names <- vapply(rv$battery_scenarios[unresolved], function(sc) sc$name, character(1))
+          rv$job_error <- sprintf(
+            "Enter a positive Ht for scenario(s) %s \u2014 either that scenario's own Ht override or a Tab 1 default \u2014 required by the host structure(s) you selected.",
+            paste(bad_names, collapse = ", ")
+          )
+          return()
+        }
+      }
       spec <- list(
         job_type = "battery", mode = mode, structures = structures,
         scenarios = rv$battery_scenarios,
@@ -445,6 +463,10 @@ server <- function(input, output, session) {
         compiled_models = COMPILED_MODELS, taxon_name = input$taxon_name
       )
     } else {
+      if (needs_host && (is.na(Ht) || Ht <= 0)) {
+        rv$job_error <- "Enter a positive total host-species pool (Ht) before running \u2014 required by the host structure(s) you selected."
+        return()
+      }
       if (is.na(input$ST_alpha) || is.na(input$ST_beta) || input$ST_alpha <= 0 || input$ST_beta <= 0) {
         rv$job_error <- "Enter a valid S_T Gamma prior (alpha > 0, beta > 0) before running."
         return()
