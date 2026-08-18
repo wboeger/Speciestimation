@@ -90,7 +90,7 @@ plot_effort_trend(interval_table)
 
 ```{r single-comparison, results='asis', eval=identical(results$job_type, "single") && !is.null(results$comparison_table)}
 cat("\n\n## Structure comparison\n\n")
-cat("\n\nYou fit", length(results$per_structure), "structures on the same data \u2014 ranked below by LOO-ELPD (higher/less negative is better). This is how the app lets the observed S_i-vs-effort-vs-time relationship indicate which formula (linear or exponential trend, with or without the host term) fits best, rather than requiring a guess.\n\n")
+cat("\n\nYou fit", length(results$per_structure), "structures on the same data — ranked below by LOO-ELPD (higher/less negative is better). This is how the app lets the observed S_i-vs-effort-vs-time relationship indicate which formula (linear or exponential trend, with or without the host term) fits best, rather than requiring a guess.\n\n")
 cat("\n\nBest-supported: **", structure_label(results$best_model_label), "**\n\n")
 
 comp <- results$comparison_table
@@ -131,7 +131,7 @@ for (st in names(results$per_structure)) {
 ```
 
 ```{r battery-results, results='asis', eval=identical(results$job_type, "battery")}
-cat("\n\n## Sensitivity battery: all scenarios \u00d7 structures\n\n")
+cat("\n\n## Sensitivity battery: all scenarios × structures\n\n")
 cat("\n\nBest-supported model by LOO-ELPD: **", structure_label(sub("^[^_]+_", "", results$best_model_label)) , "** (scenario ", sub("_.*$", "", results$best_model_label), ")\n\n")
 
 comp <- results$comparison_table

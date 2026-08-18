@@ -50,7 +50,7 @@ split_authors <- function(authorship) {
   parts
 }
 
-# CTFB (Cat\u00e1logo Taxon\u00f4mico da Fauna do Brasil) Darwin-Core-style taxonomic
+# CTFB (Catálogo Taxonômico da Fauna do Brasil) Darwin-Core-style taxonomic
 # hierarchy columns available for the optional "Category" filter below.
 CATEGORY_RANK_COLUMNS <- c(
   "phylum", "superClass", "class", "subClass", "infraClass", "superOrder", "order", "subOrder",
@@ -65,22 +65,34 @@ CATEGORY_RANK_COLUMNS <- c(
 # submitted) to restrict to freshwater taxa.
 HABITAT_COLUMNS <- c("habitat", "environment", "SALINITY", "lifeForm")
 
+# Accepted-name / species-rank vocabulary: CTFB exports use Portuguese
+# ALL-CAPS terms ("NOME_ACEITO", "ESPECIE"); a plain Darwin Core Archive
+# (e.g. from GBIF) uses the TDWG-standard English terms ("accepted",
+# "species"). Matched case-insensitively so either vocabulary works, and
+# rows with any OTHER status/rank (synonym, genus, etc.) are still excluded
+# either way.
+ACCEPTED_STATUS_VALUES <- c("nome_aceito", "accepted")
+SPECIES_RANK_VALUES <- c("especie", "species")
+
 #' Optional pre-filter for full CTFB-style exports: restrict to one taxonomic
 #' category/value (e.g. family = "Dactylogyridae"), one habitat/value (e.g.
 #' habitat = "agua doce", i.e. freshwater), and, optionally (when the
 #' relevant columns are present AND `apply_status_rank_filter` is TRUE), to
-#' accepted names at species rank (taxonomicStatus == "NOME_ACEITO",
-#' taxonRank == "ESPECIE"). Any filter whose column is absent from `df` is
-#' silently skipped, so this works unchanged for minimal, non-CTFB
-#' spreadsheets too.
+#' accepted names at species rank — matched case-insensitively against
+#' either CTFB's Portuguese vocabulary (taxonomicStatus == "NOME_ACEITO",
+#' taxonRank == "ESPECIE") or the Darwin Core standard English vocabulary
+#' (taxonomicStatus == "accepted", taxonRank == "species"), so a plain GBIF-
+#' style Darwin Core export works the same as a CTFB export. Any filter
+#' whose column is absent from `df` is silently skipped, so this works
+#' unchanged for minimal, non-CTFB spreadsheets too.
 #'
 #' @param habitat_column,habitat_value habitat/environment restriction. The
 #'   column value is split on ";" before matching (some CTFB exports record
 #'   multiple habitats per row, e.g. "agua doce;marinho"), so a row matches
-#'   if `habitat_value` is ANY of its semicolon-separated tokens \u2014 not just
+#'   if `habitat_value` is ANY of its semicolon-separated tokens — not just
 #'   an exact whole-cell match.
 #' @param apply_status_rank_filter if FALSE, skip the taxonomicStatus/
-#'   taxonRank restriction even when those columns are present \u2014 needed to
+#'   taxonRank restriction even when those columns are present — needed to
 #'   reproduce analyses (e.g. a prior manuscript run) that used every row
 #'   matching the year/name/host criteria regardless of status or rank.
 #' @return list(df = filtered data.frame, n_before, n_after, applied = character vector of filters used)
@@ -112,12 +124,14 @@ apply_category_status_filter <- function(df, category_column = NULL, category_va
 
   if (isTRUE(apply_status_rank_filter)) {
     if ("taxonomicStatus" %in% names(df)) {
-      df <- df[!is.na(df$taxonomicStatus) & df$taxonomicStatus == "NOME_ACEITO", , drop = FALSE]
-      applied <- c(applied, 'taxonomicStatus = "NOME_ACEITO"')
+      status_norm <- tolower(stringr::str_trim(as.character(df$taxonomicStatus)))
+      df <- df[!is.na(status_norm) & status_norm %in% ACCEPTED_STATUS_VALUES, , drop = FALSE]
+      applied <- c(applied, 'taxonomicStatus = accepted ("NOME_ACEITO"/"accepted")')
     }
     if ("taxonRank" %in% names(df)) {
-      df <- df[!is.na(df$taxonRank) & df$taxonRank == "ESPECIE", , drop = FALSE]
-      applied <- c(applied, 'taxonRank = "ESPECIE"')
+      rank_norm <- tolower(stringr::str_trim(as.character(df$taxonRank)))
+      df <- df[!is.na(rank_norm) & rank_norm %in% SPECIES_RANK_VALUES, , drop = FALSE]
+      applied <- c(applied, 'taxonRank = species ("ESPECIE"/"species")')
     }
   }
 
@@ -238,7 +252,7 @@ process_species_data <- function(df, mode, interval_years, start_year = NULL, en
     }
   }
   if (nrow(agg) < 3) {
-    stop("Fewer than 3 usable time intervals after aggregation \u2014 widen the year range, use a smaller interval width, or check the data.", call. = FALSE)
+    stop("Fewer than 3 usable time intervals after aggregation — widen the year range, use a smaller interval width, or check the data.", call. = FALSE)
   }
 
   cumSi <- c(0, utils::head(agg$cum_species_end, -1))

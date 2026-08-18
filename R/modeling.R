@@ -13,10 +13,10 @@
 # lets the data -- not a guess -- indicate which formula fits best.
 
 STRUCTURE_LABELS <- c(
-  host_exp = "Host \u2014 exponential trend",
-  host_linear = "Host \u2014 linear trend",
-  no_host_exp = "No host \u2014 exponential trend",
-  no_host_linear = "No host \u2014 linear trend"
+  host_exp = "Host — exponential trend",
+  host_linear = "Host — linear trend",
+  no_host_exp = "No host — exponential trend",
+  no_host_linear = "No host — linear trend"
 )
 
 structure_is_host <- function(structure) grepl("^host", structure)
@@ -290,7 +290,7 @@ run_single_job <- function(spec) {
 #' (NULL/NA), the run-level `spec$Ht` (Tab 1 default) is used instead. This
 #' lets a single battery cross host-pool assumptions with ST-prior scenarios
 #' in one run -- exactly the Conservative-vs-Extrapolated Ht sensitivity the
-#' source manuscript ran as two separate batches (see manual \u00a72.2).
+#' source manuscript ran as two separate batches (see manual §2.2).
 run_battery_job <- function(spec) {
   fits <- list()
   rows <- list()

@@ -117,12 +117,12 @@ server <- function(input, output, session) {
         helpText("Required columns: scientificName, namePublishedInYear, scientificNameAuthorship",
                  "; parasitic mode additionally requires animalHostNames (semicolon-separated host list)."),
         numericInput("interval_years", "Interval width (years)", value = 5, min = 1, max = 50, step = 1),
-        numericInput("start_year", "Start year (optional \u2014 blank = earliest in data)", value = NA),
-        numericInput("end_year", "End year (optional \u2014 blank = latest in data)", value = NA),
+        numericInput("start_year", "Start year (optional — blank = earliest in data)", value = NA),
+        numericInput("end_year", "End year (optional — blank = latest in data)", value = NA),
         conditionalPanel(
           condition = "input.mode == 'parasitic'",
           numericInput("Ht", "Total known/expected host-species pool (Ht)", value = NA, min = 1),
-          helpText("A fixed number, not fitted \u2014 your best estimate of the total number of host species available to this parasite group.")
+          helpText("A fixed number, not fitted — your best estimate of the total number of host species available to this parasite group.")
         )
       ),
       h4("Preview & validation"),
@@ -258,7 +258,7 @@ server <- function(input, output, session) {
     cf <- tryCatch(rv_category(), error = function(e) NULL)
     if (is.null(cf) || length(cf$applied) == 0) return(NULL)
     div(class = "status-box",
-        sprintf("Category/status filter applied (%s): %d \u2192 %d rows.",
+        sprintf("Category/status filter applied (%s): %d → %d rows.",
                 paste(cf$applied, collapse = "; "), cf$n_before, cf$n_after))
   })
 
@@ -311,24 +311,24 @@ server <- function(input, output, session) {
 
         conditionalPanel(condition = "!input.run_battery",
           h5("Prior for S_T (total species): Gamma(alpha, beta)"),
-          helpText("Gamma mean = alpha / beta. Set these from your best guess of the total species count and your confidence in it \u2014 there is no default."),
+          helpText("Gamma mean = alpha / beta. Set these from your best guess of the total species count and your confidence in it — there is no default."),
           numericInput("ST_alpha", "alpha (shape)", value = NA, min = 0.001),
           numericInput("ST_beta", "beta (rate)", value = NA, min = 0.00001, step = 0.0001),
           h5("Prior for beta (time trend): Normal(mean, sd)"),
-          helpText("Shared by both trend forms below \u2014 the rate of change in efficiency over time."),
+          helpText("Shared by both trend forms below — the rate of change in efficiency over time."),
           numericInput("beta_mean", "mean", value = 0),
           numericInput("beta_sd", "sd", value = 0.1, min = 0.001),
           conditionalPanel(
             condition = "input.structures && (input.structures.indexOf('host_exp') > -1 || input.structures.indexOf('no_host_exp') > -1)",
-            h5("Prior for log(L0) \u2014 exponential trend: Normal(mean, sd)"),
-            helpText("Used by any selected \u201cexponential trend\u201d structure: L(Y) = L0 \u00b7 e^(\u03b2Y)."),
+            h5("Prior for log(L0) — exponential trend: Normal(mean, sd)"),
+            helpText("Used by any selected “exponential trend” structure: L(Y) = L0 · e^(βY)."),
             numericInput("log_L0_mean", "mean", value = 0),
             numericInput("log_L0_sd", "sd", value = 2, min = 0.01)
           ),
           conditionalPanel(
             condition = "input.structures && (input.structures.indexOf('host_linear') > -1 || input.structures.indexOf('no_host_linear') > -1)",
-            h5("Prior for L0 \u2014 linear trend: Normal(mean, sd), L0 > 0"),
-            helpText("Used by any selected \u201clinear trend\u201d structure: L(Y) = L0 + \u03b2Y. L0 is on the natural scale (not logged) \u2014 typically a very small number; see the manual for scaling guidance."),
+            h5("Prior for L0 — linear trend: Normal(mean, sd), L0 > 0"),
+            helpText("Used by any selected “linear trend” structure: L(Y) = L0 + βY. L0 is on the natural scale (not logged) — typically a very small number; see the manual for scaling guidance."),
             numericInput("L0_mean", "mean", value = 0.001, step = 0.0001),
             numericInput("L0_sd", "sd", value = 0.01, min = 0.0001, step = 0.0001)
           )
@@ -347,8 +347,8 @@ server <- function(input, output, session) {
           numericInput("sc_L0_sd", "L0 sd (linear trend)", value = 0.01, min = 0.0001, step = 0.0001),
           conditionalPanel(
             condition = "input.mode == 'parasitic'",
-            numericInput("sc_Ht", "Ht override (host structures only \u2014 blank = use Tab 1 Ht)", value = NA, min = 1),
-            helpText("Set a different host-pool size per scenario to test how much your ST estimate depends on that assumption \u2014 e.g. pair a documented Ht with a conservative parasite/host ratio in one scenario, and an estimated/extrapolated Ht with a higher ratio in another (see manual \u00a72.2).")
+            numericInput("sc_Ht", "Ht override (host structures only — blank = use Tab 1 Ht)", value = NA, min = 1),
+            helpText("Set a different host-pool size per scenario to test how much your ST estimate depends on that assumption — e.g. pair a documented Ht with a conservative parasite/host ratio in one scenario, and an estimated/extrapolated Ht with a higher ratio in another (see manual §2.2).")
           ),
           actionButton("add_scenario", "Add scenario", class = "btn-secondary"),
           actionButton("clear_scenarios", "Clear all scenarios", class = "btn-outline-danger"),
@@ -356,7 +356,7 @@ server <- function(input, output, session) {
         ),
         hr(),
         h5("MCMC settings"),
-        checkboxInput("full_precision", "Full precision (iter=20000, warmup=10000) \u2014 slow", value = FALSE),
+        checkboxInput("full_precision", "Full precision (iter=20000, warmup=10000) — slow", value = FALSE),
         conditionalPanel(condition = "!input.full_precision",
           numericInput("iter", "Iterations", value = 4000, min = 500),
           numericInput("warmup", "Warmup", value = 2000, min = 250)
@@ -374,10 +374,10 @@ server <- function(input, output, session) {
     if (identical(input$mode %||% "parasitic", "parasitic")) {
       checkboxGroupInput("structures", NULL,
         choices = c(
-          "Host \u2014 exponential trend" = "host_exp",
-          "Host \u2014 linear trend" = "host_linear",
-          "No host \u2014 exponential trend" = "no_host_exp",
-          "No host \u2014 linear trend" = "no_host_linear"
+          "Host — exponential trend" = "host_exp",
+          "Host — linear trend" = "host_linear",
+          "No host — exponential trend" = "no_host_exp",
+          "No host — linear trend" = "no_host_linear"
         ),
         selected = c("host_exp", "no_host_exp"))
     } else {
@@ -448,7 +448,7 @@ server <- function(input, output, session) {
         if (any(unresolved)) {
           bad_names <- vapply(rv$battery_scenarios[unresolved], function(sc) sc$name, character(1))
           rv$job_error <- sprintf(
-            "Enter a positive Ht for scenario(s) %s \u2014 either that scenario's own Ht override or a Tab 1 default \u2014 required by the host structure(s) you selected.",
+            "Enter a positive Ht for scenario(s) %s — either that scenario's own Ht override or a Tab 1 default — required by the host structure(s) you selected.",
             paste(bad_names, collapse = ", ")
           )
           return()
@@ -464,7 +464,7 @@ server <- function(input, output, session) {
       )
     } else {
       if (needs_host && (is.na(Ht) || Ht <= 0)) {
-        rv$job_error <- "Enter a positive total host-species pool (Ht) before running \u2014 required by the host structure(s) you selected."
+        rv$job_error <- "Enter a positive total host-species pool (Ht) before running — required by the host structure(s) you selected."
         return()
       }
       if (is.na(input$ST_alpha) || is.na(input$ST_beta) || input$ST_alpha <= 0 || input$ST_beta <= 0) {
@@ -519,7 +519,7 @@ server <- function(input, output, session) {
       div(class = "status-box", style = "background:#fdeaea;color:#a33;", paste("Error:", rv$job_error))
     } else if (identical(st, "running")) {
       div(class = "status-box",
-          sprintf("Running\u2026 (%ss elapsed). Only one analysis runs at a time across all users \u2014 if others are ahead of you, this includes their wait time too.", elapsed %||% 0))
+          sprintf("Running… (%ss elapsed). Only one analysis runs at a time across all users — if others are ahead of you, this includes their wait time too.", elapsed %||% 0))
     } else if (identical(st, "success")) {
       div(class = "status-box", style = "background:#eaf7ea;color:#274;",
           sprintf("Done in %ss. See the Results and Download Report tabs.", elapsed %||% 0))
@@ -542,7 +542,7 @@ server <- function(input, output, session) {
       comparison_section <- if (!is.null(res$comparison_table)) {
         tagList(
           h3("Structure comparison"),
-          p("You fit ", length(res$per_structure), " structures on the same data \u2014 ranked below by LOO-ELPD (higher/less negative is better). This is how the app lets the observed Si-vs-effort-vs-time relationship indicate which formula (linear or exponential trend, with or without the host term) fits best, rather than requiring a guess."),
+          p("You fit ", length(res$per_structure), " structures on the same data — ranked below by LOO-ELPD (higher/less negative is better). This is how the app lets the observed Si-vs-effort-vs-time relationship indicate which formula (linear or exponential trend, with or without the host term) fits best, rather than requiring a guess."),
           p(strong("Best-supported: "), structure_label(res$best_model_label)),
           DTOutput("single_cmp_table"),
           fluidRow(
@@ -627,7 +627,7 @@ server <- function(input, output, session) {
   # ---- 4. Report ------------------------------------------------------------
   report_ui <- function() {
     tagList(
-      p("Generate a single self-contained HTML report bundling every figure, the parameter table, and the methods text. Nothing is saved server-side \u2014 the file is built fresh into your download."),
+      p("Generate a single self-contained HTML report bundling every figure, the parameter table, and the methods text. Nothing is saved server-side — the file is built fresh into your download."),
       downloadButton("download_report", "Download report (.html)", class = "btn-primary")
     )
   }

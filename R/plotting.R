@@ -82,7 +82,7 @@ plot_percent_described <- function(pct_draws) {
     ggplot2::geom_vline(xintercept = med, color = "darkred", linewidth = 1) +
     ggplot2::labs(
       title = "Estimated percentage of total diversity already described",
-      subtitle = sprintf("Median: %.1f%%  |  95%% CrI: %.1f%%\u2013%.1f%%", med, lo, hi),
+      subtitle = sprintf("Median: %.1f%%  |  95%% CrI: %.1f%%–%.1f%%", med, lo, hi),
       x = "% of estimated ST already described", y = "Posterior density"
     ) +
     theme_app()
@@ -129,7 +129,7 @@ plot_effort_scatter_sim <- function(fit, interval_table, n_draws = 100) {
     theme_app()
 }
 
-#' Trend in taxonomist effort (Ti) itself over time. Purely descriptive \u2014
+#' Trend in taxonomist effort (Ti) itself over time. Purely descriptive —
 #' no fitted model required, so it is available as soon as data is
 #' aggregated (Tab 1), independently of any structure you go on to fit. Lets
 #' you see whether the effort covariate is itself trending up/down/flat
@@ -140,7 +140,7 @@ plot_effort_trend <- function(interval_table) {
     ggplot2::geom_point(size = 2.5, color = "darkorange") +
     ggplot2::geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 0.8, formula = y ~ x) +
     ggplot2::labs(title = "Trend in taxonomic effort over time",
-                  subtitle = "Unique taxonomists (authors) active per interval \u2014 independent of species counts",
+                  subtitle = "Unique taxonomists (authors) active per interval — independent of species counts",
                   x = "Interval end-year", y = "Unique taxonomists active (Ti)") +
     theme_app()
 }
@@ -175,7 +175,7 @@ plot_predictive_scores <- function(scores_df) {
 #' each fitted model's LOO-ELPD rank plotted against its CRPS rank, ordered
 #' along the x-axis by CRPS rank (1 = best). Requires 2+ fitted models
 #' (single-run comparison or battery). Visualizes how well the two proper
-#' scoring rules agree on which models perform best \u2014 large gaps between
+#' scoring rules agree on which models perform best — large gaps between
 #' the two lines for a given model flag disagreement between the metrics,
 #' which the manuscript itself found for several mid/low-ranked models even
 #' though the top-ranked models showed strong consensus across both.
@@ -198,7 +198,7 @@ plot_rank_comparison <- function(comparison_df) {
     ggplot2::scale_y_reverse(breaks = seq_len(nrow(df))) +
     ggplot2::scale_color_manual(values = c(CRPS_Rank = "#F8766D", ELPD_Rank = "#00BFC4")) +
     ggplot2::labs(title = "Model performance ranking: LOO-ELPD vs. CRPS concordance",
-                  subtitle = "Ordered by CRPS rank (1 = best) \u2014 gaps between the two lines flag metric disagreement",
+                  subtitle = "Ordered by CRPS rank (1 = best) — gaps between the two lines flag metric disagreement",
                   x = "Model", y = "Performance rank (1 = best)", color = "Evaluation metric") +
     theme_app() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
