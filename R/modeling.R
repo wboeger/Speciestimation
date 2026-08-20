@@ -1,31 +1,45 @@
 # R/modeling.R
 #
 # Stan fitting, model comparison (LOO-ELPD, CRPS/MAE), and forward-extrapolation
-# helpers. Works identically for any of the four model structures and for any
+# helpers. Works identically for any of the six model structures and for any
 # taxon, given a `stan_data_base` list produced by process_species_data().
 #
 # A "structure" is one of "host_exp", "host_linear", "no_host_exp",
-# "no_host_linear": whether a host-availability covariate is included, and
-# whether the taxonomic-efficiency trend over time is modeled as exponential
-# (L0 * exp(beta*Yi), matching the Dactylogyridae model in Boeger et al.) or
-# linear (L0 + beta*Yi, matching the Actinopterygii/Pimm-Joppa model). Fitting
-# multiple structures and comparing them via LOO-ELPD/CRPS/MAE is how the app
-# lets the data -- not a guess -- indicate which formula fits best.
+# "no_host_linear", "no_host_exp_negbin", "no_host_linear_negbin": whether a
+# host-availability covariate is included, whether the taxonomic-efficiency
+# trend over time is modeled as exponential (L0 * exp(beta*Yi), matching the
+# Dactylogyridae model in Boeger et al.) or linear (L0 + beta*Yi, matching
+# the Actinopterygii/Pimm-Joppa model), and whether the discovery-count
+# likelihood is Poisson (default) or Negative Binomial (the "_negbin"
+# suffix -- an extra dispersion parameter phi absorbs overdispersion, which
+# is exactly the likelihood Boeger et al. used for their Actinopterygii
+# model; only offered without a host term, matching the source manuscript).
+# Fitting multiple structures and comparing them via LOO-ELPD/CRPS/MAE is
+# how the app lets the data -- not a guess -- indicate which formula fits
+# best.
 
 STRUCTURE_LABELS <- c(
   host_exp = "Host — exponential trend",
   host_linear = "Host — linear trend",
   no_host_exp = "No host — exponential trend",
-  no_host_linear = "No host — linear trend"
+  no_host_linear = "No host — linear trend",
+  no_host_exp_negbin = "No host — exponential trend (Neg. Binomial)",
+  no_host_linear_negbin = "No host — linear trend (Neg. Binomial)"
 )
 
 structure_is_host <- function(structure) grepl("^host", structure)
 structure_trend <- function(structure) ifelse(grepl("linear", structure), "linear", "exp")
+structure_is_negbin <- function(structure) grepl("negbin$", structure)
 structure_label <- function(structure) unname(STRUCTURE_LABELS[structure])
 
 #' Build the full data list Stan needs for one structure + one prior scenario.
 #' `prior` may carry both log_L0_*/L0_* fields; only the ones the chosen
-#' structure's trend form needs are used.
+#' structure's trend form needs are used. For Negative-Binomial structures,
+#' `prior$st_bounded = TRUE` switches the ST prior from Gamma(alpha,beta) to
+#' the bounded/flat mode the source manuscript used for Actinopterygii
+#' (implicit uniform prior over `prior$ST_lower_bound`/`prior$ST_upper_bound`,
+#' both of which default to the manuscript's own convention -- observed
+#' total + 10 / observed total x 10 -- when not supplied).
 build_stan_data <- function(stan_data_base, structure, prior, Ht = NULL) {
   d <- stan_data_base
   d$ST_prior_alpha <- prior$ST_alpha
@@ -50,8 +64,34 @@ build_stan_data <- function(stan_data_base, structure, prior, Ht = NULL) {
     d$cumHi <- NULL
     d$Ht <- NULL
   }
+
+  if (structure_is_negbin(structure)) {
+    observed_total <- sum(stan_data_base$Si)
+    st_bounded <- isTRUE(prior$st_bounded)
+    d$use_st_gamma_prior <- if (st_bounded) 0L else 1L
+    if (st_bounded) {
+      d$ST_lower_bound <- if (!is.null(prior$ST_lower_bound) && !is.na(prior$ST_lower_bound)) {
+        prior$ST_lower_bound
+      } else {
+        observed_total + 10
+      }
+      d$ST_upper_bound <- if (!is.null(prior$ST_upper_bound) && !is.na(prior$ST_upper_bound)) {
+        prior$ST_upper_bound
+      } else {
+        observed_total * 10
+      }
+      # Stan still validates the <lower=0> constraint on ST_prior_alpha/beta
+      # even though the gamma prior line is skipped at runtime -- supply
+      # harmless placeholders so the data block loads.
+      d$ST_prior_alpha <- 1
+      d$ST_prior_beta <- 1
+    } else {
+      d$ST_upper_bound <- 1e12 # effectively unbounded; Gamma prior does the real work
+    }
+  }
   d
 }
+
 
 #' Fit one of the four Stan model structures for one prior scenario.
 #'
@@ -75,15 +115,17 @@ fit_species_model <- function(stan_data_base, structure, prior, Ht, compiled_mod
   )
 }
 
-#' Tidy parameter summary table (ST, efficiency intercept, beta) with 95% CrI
-#' and convergence diagnostics. Handles both trend-form parameterizations:
-#' the exponential form fits log_L0 (a derived natural-scale L0 row is
-#' added); the linear form fits L0 directly on the natural scale.
+#' Tidy parameter summary table (ST, efficiency intercept, beta, and phi for
+#' Negative-Binomial structures) with 95% CrI and convergence diagnostics.
+#' Handles both trend-form parameterizations: the exponential form fits
+#' log_L0 (a derived natural-scale L0 row is added); the linear form fits L0
+#' directly on the natural scale.
 summarize_fit <- function(fit, structure) {
   trend <- structure_trend(structure)
   eff_par <- if (identical(trend, "exp")) "log_L0" else "L0"
+  extra_pars <- if (structure_is_negbin(structure)) "phi" else character(0)
 
-  s <- rstan::summary(fit, pars = c("ST", eff_par, "beta"), probs = c(0.025, 0.5, 0.975))$summary
+  s <- rstan::summary(fit, pars = c("ST", eff_par, "beta", extra_pars), probs = c(0.025, 0.5, 0.975))$summary
   s <- as.data.frame(s)
   s$parameter <- rownames(s)
   s <- s[, c("parameter", "mean", "2.5%", "50%", "97.5%", "n_eff", "Rhat")]

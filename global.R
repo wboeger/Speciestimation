@@ -41,7 +41,8 @@ if (future::supportsMulticore()) {
 # Four structural combinations: host on/off (needs a host inventory + Ht)
 # crossed with the efficiency-trend form (exponential vs. linear over time).
 STAN_DIR <- "stan"
-STRUCTURE_KEYS <- c("host_exp", "host_linear", "no_host_exp", "no_host_linear")
+STRUCTURE_KEYS <- c("host_exp", "host_linear", "no_host_exp", "no_host_linear",
+                     "no_host_exp_negbin", "no_host_linear_negbin")
 
 load_or_compile <- function(rds_path, stan_path) {
   if (file.exists(rds_path)) {

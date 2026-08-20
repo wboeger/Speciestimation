@@ -333,6 +333,20 @@ server <- function(input, output, session) {
             numericInput("L0_sd", "sd", value = 0.01, min = 0.0001, step = 0.0001)
           )
         ),
+        conditionalPanel(
+          condition = "!input.run_battery && input.structures && (input.structures.indexOf('no_host_exp_negbin') > -1 || input.structures.indexOf('no_host_linear_negbin') > -1)",
+          hr(),
+          h5("Negative-Binomial structures: S_T prior mode"),
+          checkboxInput("st_bounded_mode",
+            "Use a bounded (flat) prior instead of Gamma — matches the source manuscript's Actinopterygii model",
+            value = FALSE),
+          helpText("Only affects the Negative-Binomial structure(s) selected above; any Poisson structure you've also selected always uses the Gamma prior. Bounded mode has no shape parameter — S_T is simply constrained to [lower, upper] with an implicit flat prior over that range, exactly as in the source manuscript's Actinopterygii model."),
+          conditionalPanel(
+            condition = "input.st_bounded_mode",
+            numericInput("st_bound_lower", "S_T lower bound (blank = observed total + 10)", value = NA, min = 1),
+            numericInput("st_bound_upper", "S_T upper bound (blank = observed total × 10)", value = NA, min = 1)
+          )
+        ),
         conditionalPanel(condition = "input.run_battery",
           h5("Battery scenarios"),
           helpText("Each scenario carries priors for BOTH trend forms; whichever your selected structures need gets used."),
@@ -377,14 +391,18 @@ server <- function(input, output, session) {
           "Host — exponential trend" = "host_exp",
           "Host — linear trend" = "host_linear",
           "No host — exponential trend" = "no_host_exp",
-          "No host — linear trend" = "no_host_linear"
+          "No host — linear trend" = "no_host_linear",
+          "No host — exponential trend (Neg. Binomial)" = "no_host_exp_negbin",
+          "No host — linear trend (Neg. Binomial)" = "no_host_linear_negbin"
         ),
         selected = c("host_exp", "no_host_exp"))
     } else {
       checkboxGroupInput("structures", NULL,
         choices = c(
           "Exponential trend" = "no_host_exp",
-          "Linear trend" = "no_host_linear"
+          "Linear trend" = "no_host_linear",
+          "Exponential trend (Neg. Binomial)" = "no_host_exp_negbin",
+          "Linear trend (Neg. Binomial)" = "no_host_linear_negbin"
         ),
         selected = c("no_host_exp", "no_host_linear"))
     }
@@ -421,6 +439,7 @@ server <- function(input, output, session) {
     needs_host <- any(structure_is_host(structures))
     needs_exp <- any(structure_trend(structures) == "exp")
     needs_linear <- any(structure_trend(structures) == "linear")
+    needs_negbin <- any(structure_is_negbin(structures))
 
     if (length(structures) == 0) {
       rv$job_error <- "Select at least one structure to fit."
@@ -467,7 +486,9 @@ server <- function(input, output, session) {
         rv$job_error <- "Enter a positive total host-species pool (Ht) before running — required by the host structure(s) you selected."
         return()
       }
-      if (is.na(input$ST_alpha) || is.na(input$ST_beta) || input$ST_alpha <= 0 || input$ST_beta <= 0) {
+      st_bounded <- isTRUE(input$st_bounded_mode) && needs_negbin
+      needs_gamma_st <- !st_bounded || any(!structure_is_negbin(structures))
+      if (needs_gamma_st && (is.na(input$ST_alpha) || is.na(input$ST_beta) || input$ST_alpha <= 0 || input$ST_beta <= 0)) {
         rv$job_error <- "Enter a valid S_T Gamma prior (alpha > 0, beta > 0) before running."
         return()
       }
@@ -482,7 +503,9 @@ server <- function(input, output, session) {
       prior <- list(ST_alpha = input$ST_alpha, ST_beta = input$ST_beta,
                     log_L0_mean = input$log_L0_mean, log_L0_sd = input$log_L0_sd,
                     L0_mean = input$L0_mean, L0_sd = input$L0_sd,
-                    beta_mean = input$beta_mean, beta_sd = input$beta_sd)
+                    beta_mean = input$beta_mean, beta_sd = input$beta_sd,
+                    st_bounded = st_bounded,
+                    ST_lower_bound = input$st_bound_lower, ST_upper_bound = input$st_bound_upper)
       spec <- list(
         job_type = "single", mode = mode, structures = structures,
         prior = prior, stan_data_base = rv$processed$stan_data_base, Ht = Ht,

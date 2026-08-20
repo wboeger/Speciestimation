@@ -29,10 +29,12 @@ et al. (2010) and Joppa et al. (2011).
 species-description records (any parasitic or free-living group), and the app
 fits the model to *your* data with *your* priors.
 
-Two independent modeling choices combine into up to **four candidate model
-structures**, and the app fits and statistically compares as many of them as
-you select — letting your data, not a guess, indicate which formula
-describes it best (§2.5):
+Two independent modeling choices combine into up to **four candidate Poisson
+model structures**, plus an optional third choice — swapping the Poisson
+likelihood for a Negative Binomial one — adds two more (for **six candidate
+structures** in total; §2.3). The app fits and statistically compares as
+many of them as you select, letting your data, not a guess, indicate which
+formula describes it best (§2.5):
 
 - **Host term**: on (parasitic mode, with a defined host pool) or off
   (free-living mode, or parasitic data without a usable host pool).
@@ -181,11 +183,13 @@ fits (§2.1's product-to-sum identity applied to $L_i$ alone):
   a small positive value so the Poisson rate (and this log) stays valid even
   where the trend would otherwise cross zero within your observed range.
 
-Crossing these two axes gives **four selectable structures**: *host +
+Crossing these two axes gives **four Poisson structures**: *host +
 exponential*, *host + linear*, *no-host + exponential*, *no-host + linear*
 (the last two are the only options in free-living mode). Fit two or more of
 them together and the app ranks them for you (§2.5) — this is how "which
-formula fits my data" gets answered empirically rather than guessed.
+formula fits my data" gets answered empirically rather than guessed. An
+optional Negative-Binomial likelihood adds two more no-host structures —
+see below.
 
 > **Practical note on numerical stability.** The *host + linear* combination
 > multiplies two large, independently varying "remaining pool" terms
@@ -199,6 +203,65 @@ formula fits my data" gets answered empirically rather than guessed.
 > "Full precision" iterations, or compare against the *host + exponential*
 > structure instead (which does not share this issue and is what the source
 > manuscript uses for its host-covariate model).
+
+## Optional likelihood family: Negative Binomial (overdispersed counts)
+
+All four structures above assume $S_i \sim \text{Poisson}(\lambda_i)$,
+which constrains the variance of $S_i$ to equal its mean. Real discovery
+time series are often **overdispersed** — description activity comes in
+bursts (a monograph, a new survey program) rather than at a smooth,
+Poisson-regular rate. Boeger et al.'s own Actinopterygii model uses a
+**Negative Binomial** likelihood for exactly this reason (their Table 3
+reports a fitted dispersion parameter $\phi$, median 3.68, 95% CI
+2.31–5.75, and states explicitly that species description "is not uniform
+over time … characterized by periods of higher and lower activity than
+would be expected under a simple Poisson process").
+
+Two extra structures let you test this on your own data: **no-host +
+exponential (Neg. Binomial)** and **no-host + linear (Neg. Binomial)** —
+the same mean structure $\lambda_i$ as their Poisson counterparts above,
+but $S_i \sim \text{NegBinomial2}(\lambda_i, \phi)$ instead, where $\phi$ is
+a dispersion parameter ($\phi \to \infty$ recovers the Poisson case;
+smaller $\phi$ means more overdispersion). These structures are **no-host
+only** (available in both parasitic and free-living mode) — the
+host-covariate structures always use Poisson, matching the source
+manuscript's own Dactylogyridae model. $\phi$ is not a prior you set: it is
+fit with a fixed, weakly-informative log-normal prior
+($\log\phi \sim \text{Normal}(\log 5, 1)$, centered near the order of
+magnitude the source manuscript found for Actinopterygii) and reported in
+the parameter table alongside $S_T$, the efficiency intercept, and $\beta$.
+
+Fit a Negative-Binomial structure alongside its Poisson counterpart and let
+LOO-ELPD/CRPS (§2.5) tell you whether the extra dispersion parameter earns
+its keep for your data — exactly how the app lets you compare
+host-vs-no-host or exponential-vs-linear.
+
+**$S_T$ prior mode for Negative-Binomial structures.** These two structures
+offer a second $S_T$-prior option beyond the Gamma prior every other
+structure uses: a **bounded (flat)** prior — $S_T$ constrained only to
+$[\text{lower}, \text{upper}]$ with no further shape, exactly the approach
+the source manuscript used for Actinopterygii (lower = observed total + 10,
+upper = observed total $\times$ 10 by default, both overridable). Toggle
+this on Tab 2 ("Use a bounded (flat) prior instead of Gamma"); it only
+affects whichever Negative-Binomial structure(s) you've selected — any
+Poisson structure fit in the same run always uses the Gamma prior. This
+toggle is available for single runs only; battery scenarios always use the
+Gamma prior for every structure, including Negative-Binomial ones.
+
+> **Practical note.** The bounded/flat $S_T$ prior combined with a
+> Negative-Binomial likelihood is a genuinely harder inference problem than
+> the Gamma-prior Poisson structures: a wide, uninformative $S_T$ range and
+> a freely-fit dispersion parameter are both being estimated from the same
+> short time series, which can produce elevated `Rhat`, low `n_eff`, and
+> divergent transitions — especially with fewer than roughly 15–20 time
+> intervals. This mirrors the source manuscript's own experience: its
+> Actinopterygii model used this exact bounded-prior/Negative-Binomial
+> combination and required close attention to convergence diagnostics. If
+> you see poor convergence: increase iterations ("Full precision"), narrow
+> the bounds if you have external information to justify it, or compare
+> against the Gamma-prior mode for the same structure (§2.5) to see whether
+> the two prior choices materially disagree.
+
 
 ## Model fitting
 
@@ -238,7 +301,7 @@ one scoring rule over the other.
 
 This is the app's answer to "should I use a linear or exponential trend, and
 should I include the host term?" — fit the candidates you want to compare
-(any subset of the four structures) in a single run, and read off the
+(any subset of the up to six structures) in a single run, and read off the
 best-supported one, rather than assuming an answer in advance.
 
 The **sensitivity battery** (§4.3) extends the same comparison across
@@ -348,21 +411,24 @@ accounts; anyone with the password has full access.
 
 ## Tab 2 — Priors & Run
 
-1. **Structures to fit**: up to four checkboxes (parasitic mode) or two
-   (free-living mode) — see §2.3. The app pre-selects more than one so a
+1. **Structures to fit**: up to six checkboxes (parasitic mode) or four
+   (free-living mode) — see §2.3, including the two optional
+   Negative-Binomial structures. The app pre-selects more than one so a
    comparison (§2.5) is produced by default; uncheck down to a single
    structure if you only want one model's diagnostics.
 2. **Single run vs. battery**: leave "Run full sensitivity battery" unchecked
    for a fast run with one prior specification (recommended for initial
    exploration). Check it to instead define and compare several full prior
-   scenarios (step 4 below).
+   scenarios (step 5 below).
 3. **Single-run priors**: enter the Gamma($\alpha$, $\beta$) prior for $S_T$
    (no default — see §2.2 and the guidance box below) and the $\beta$
    (trend) prior, shared by both trend forms. Two more prior blocks appear
    *only* for the trend form(s) your selected structures actually need:
    log($L_0$) (exponential trend) and/or $L_0$ (linear trend, natural scale
    — typically a very small number; see the numerical-stability note in
-   §2.3 for scaling guidance).
+   §2.3 for scaling guidance). The Negative-Binomial dispersion parameter
+   $\phi$ has no prior field here — it is always fit with a fixed prior
+   (§2.3).
 
    > **Choosing $\alpha$/$\beta$ for the $S_T$ prior:** the Gamma
    > distribution's mean is $\alpha/\beta$. A simple approach: pick a rough
@@ -375,7 +441,15 @@ accounts; anyone with the password has full access.
    > cumulative species count, so $S_T$ can never be estimated below what
    > you've already described.
 
-4. **Battery scenarios**: fill in the scenario form (name, shared $S_T$/
+4. **Negative-Binomial $S_T$ prior mode** (only shown when a
+   Negative-Binomial structure is selected, single-run mode only): leave
+   "Use a bounded (flat) prior instead of Gamma" unchecked to use the same
+   Gamma prior as above for $S_T$, or check it to switch to the bounded/flat
+   mode instead (§2.3) — optionally overriding the lower/upper bounds
+   (blank = observed total + 10 / observed total $\times$ 10). Only affects
+   the Negative-Binomial structure(s) you've selected; any Poisson structure
+   in the same run always uses the Gamma prior above.
+5. **Battery scenarios**: fill in the scenario form (name, shared $S_T$/
    $\beta$ priors, plus both the exponential-trend and linear-trend
    efficiency priors — whichever your selected structures need for that
    scenario gets used) and click "Add scenario"; repeat for each scenario
@@ -386,12 +460,13 @@ accounts; anyone with the password has full access.
    the documented $H_t$ and another at a higher estimated $H_t$, each with
    its own matching $S_T$ prior, replicating the source manuscript's
    Conservative-vs-Extrapolated comparison in a single run. "Clear all
-   scenarios" resets the list.
-5. **MCMC settings**: default iterations (4000) and warmup (2000) with 4
+   scenarios" resets the list. Battery scenarios always use the Gamma prior
+   for $S_T$, including for any Negative-Binomial structure selected.
+6. **MCMC settings**: default iterations (4000) and warmup (2000) with 4
    chains are adequate for exploration; check "Full precision" (20000/10000)
    for a final, publication-quality run once you're satisfied with your setup
    — this is substantially slower.
-6. Click **Run analysis**. Only one analysis runs at a time across *all*
+7. Click **Run analysis**. Only one analysis runs at a time across *all*
    users of the app (a shared compute worker) — if others are running jobs,
    yours will start once theirs finishes. The status box shows elapsed time
    while waiting/running.
@@ -512,7 +587,8 @@ Increase iterations and warmup (or enable "Full precision"), and/or
 double-check that your priors aren't so tight that they conflict sharply
 with the data (this can create hard-to-sample posterior geometry). The
 *host + linear* structure is particularly prone to this — see the
-numerical-stability note in §2.3.
+numerical-stability note in §2.3 — as is any Negative-Binomial structure
+run in bounded (flat) $S_T$-prior mode (§2.3's Negative-Binomial note).
 
 **"Enter a valid $S_T$/log($L_0$)/$L_0$ prior" error on Run.**
 The app deliberately has no default $S_T$ prior (§2.2), and only validates
@@ -527,8 +603,9 @@ Parasitic mode; Free-living mode always uses no-host structures only.
 
 - **$S_T$** — total number of species estimated to exist in the group (the
   primary output of the model).
-- **Structure** — one of up to four model variants: host term on/off crossed
-  with exponential/linear efficiency-trend form (§2.3).
+- **Structure** — one of up to six model variants: host term on/off crossed
+  with exponential/linear efficiency-trend form, plus an optional
+  Negative-Binomial likelihood for the no-host forms (§2.3).
 - **$H_t$** — total known/expected host-species pool (host structures only);
   a fixed number you supply, not fitted. Overridable per battery scenario
   (§4.3) to sensitivity-test how much $S_T$ depends on this assumption.
@@ -548,6 +625,9 @@ Parasitic mode; Free-living mode always uses no-host structures only.
 - **CRPS / MAE** — Continuous Ranked Probability Score / Mean Absolute Error;
   metrics comparing a model's simulated predictions to observed data.
 - **Rhat, n_eff** — MCMC convergence diagnostics; see §2.4.
+- **$\phi$ (phi)** — Negative Binomial dispersion parameter (Negative-Binomial
+  structures only); larger values are closer to Poisson. Fit with a fixed
+  prior, not user-configurable (§2.3).
 
 # Citation
 
